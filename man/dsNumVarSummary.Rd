@@ -4,19 +4,29 @@
 \alias{dsNumVarSummary}
 \title{Summary for all numeric variables in a DataSHIELD table}
 \usage{
-dsNumVarSummary(x = NULL, datasources = NULL)
+dsNumVarSummary(x = NULL, datasources = DSI::datashield.connections_find())
 }
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \code{\link{DSConnection-class}} objects.}
+\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections as datasource.}
 }
 \value{
 A data.frame.
 }
 \description{
-Summary for all numeric variables in a DataSHIELD table
+Quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and mean are computed for all
+numeric variables.
 }
 \examples{
-#dsNumVarSummary("tab1")
+dsNumVarSummary("tab1")
+#       LAB_TSC    LAB_TRIG   LAB_HDL LAB_GLUC_ADJUSTED PM_BMI_CONTINUOUS
+# 5\%   4.118277 -0.47120403 0.8606589          4.095639          19.45742
+# 10\%  4.503466  0.07673459 1.0385205          4.539658          21.20121
+# 25\%  5.132161  1.01642189 1.2964949          5.222477          24.16518
+# 50\%  5.834384  2.07638965 1.5704848          6.046338          27.36816
+# 75\%  6.543257  3.08549769 1.8418712          6.857015          30.66310
+# 90\%  7.233349  4.04673538 2.0824057          7.642129          33.76176
+# 95\%  7.648063  4.58631916 2.2191369          8.126197          35.57591
+# Mean 5.856428  2.06854312 1.5619572          6.110854          27.44250
 }

@@ -18,6 +18,14 @@ A data.frame.
 Summary for categorical variable across all servers
 }
 \examples{
-#dsCatVarSummary("tab1$GENDER")
-#dsCatVarSummary("tab1$DIS_AMI")
+dsCatVarSummary("tab1$GENDER")
+#    server length level value
+# 1 server1   2163     0  1092
+# 2 server2   3088     0  1585
+# 3 server1   2163     1  1071
+# 4 server2   3088     1  1503
+
+dsCatVarSummary("tab1$DIS_AMI")
+#        id length   level value
+# 1 invalid     NA invalid    NA
 }
