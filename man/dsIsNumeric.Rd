@@ -4,12 +4,18 @@
 \alias{dsIsNumeric}
 \title{Check if columns of a DataSHIELD table are numeric}
 \usage{
-dsIsNumeric(x = NULL, datasources = NULL)
+dsIsNumeric(
+  x = NULL,
+  x.vars = NULL,
+  datasources = DSI::datashield.connections_find()
+)
 }
 \arguments{
-\item{x}{A character string referring to a data.frame coloumn.}
+\item{x}{A character string referring to a data.frame.}
 
-\item{datasources}{A list of \code{\link{DSConnection-class}} objects.}
+\item{x.vars}{Optional character string vector; a subset of the variables in table x, on which the function shall be applied}
+
+\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections.}
 }
 \value{
 A vector of boolean.
@@ -18,5 +24,11 @@ A vector of boolean.
 Check if columns of a DataSHIELD table are numeric
 }
 \examples{
-#dsIsNumeric("tab1")
+dsIsNumeric("tab1")
+# LAB_TSC           LAB_TRIG            LAB_HDL  LAB_GLUC_ADJUSTED  PM_BMI_CONTINUOUS
+#    TRUE               TRUE               TRUE               TRUE               TRUE
+# DIS_CVA           MEDI_LPD           DIS_DIAB            DIS_AMI             GENDER
+#   FALSE              FALSE              FALSE              FALSE              FALSE
+# PM_BMI_CATEGORICAL
+#              FALSE
 }

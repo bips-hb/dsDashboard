@@ -2,22 +2,28 @@
 % Please edit documentation in R/descriptivetools.R
 \name{dsCatAgg}
 \alias{dsCatAgg}
-\title{Summary for all categorical variables of a table across all servers}
+\title{Summary for one (and only one!) categorical variable of a table across all servers}
 \usage{
 dsCatAgg(x = NULL, datasources = NULL)
 }
 \arguments{
 \item{x}{A character string specifying the name of a data.frame.}
 
-\item{datasources}{A list of \code{\link{DSConnection-class}} objects.}
+\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects.}
 }
 \value{
 A data.frame.
 }
 \description{
-Summary for all categorical variables of a table across all servers
+Summary for one (and only one!) categorical variable of a table across all servers
 }
 \examples{
-#dsCatAgg("tab1$GENDER")
-#dsCatAgg("tab1$DIS_AMI")
+dsCatAgg("tab1$GENDER")
+  GENDER number of observations
+1      0                   2677
+2      1                   2574
+
+dsCatAgg("tab1$DIS_AMI")
+#   DIS_AMI number of observations
+# 1 invalid                     NA
 }

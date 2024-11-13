@@ -4,12 +4,21 @@
 \alias{dsUniqueVarnames}
 \title{Get unique variable names of a table object across all servers}
 \usage{
-dsUniqueVarnames(x = NULL, datasources = NULL)
+dsUniqueVarnames(
+  x = NULL,
+  datasources = DSI::datashield.connections_find(),
+  fastmode = T,
+  combined = T
+)
 }
 \arguments{
 \item{x}{Table name as string.}
 
-\item{datasources}{A list of 'OpalConnection'.}
+\item{datasources}{A list of 'OpalConnection'. Default is to use all findable connections.}
+
+\item{fastmode}{Deprecated. Should be TRUE.}
+
+\item{combined}{If FALSE, the available variables are returned per server, otherwise accross all servers.}
 }
 \value{
 A vector.
@@ -18,5 +27,8 @@ A vector.
 Get unique variable names of a table object across all servers
 }
 \examples{
-#dsUniqueVarnames("tab1")
+dsUniqueVarnames("tab1")
+# output:
+ [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
+ [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
 }

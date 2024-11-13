@@ -4,12 +4,13 @@
 \alias{dsCatTidy}
 \title{A tidy summary for all non-numeric variables in a DataSHIELD table}
 \usage{
-dsCatTidy(x = NULL, datasources = NULL)
+dsCatTidy(x = NULL, datasources = DSI::datashield.connections_find())
 }
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \code{\link{DSConnection-class}} objects.}
+\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default
+is to use all findable connections.}
 }
 \value{
 A data.frame.
@@ -18,5 +19,18 @@ A data.frame.
 A tidy summary for all non-numeric variables in a DataSHIELD table
 }
 \examples{
-#dsCatTidy("tab1")
+dsCatTidy("tab1")
+#              variable   level number of observations
+# 1             DIS_CVA       0                   5248
+# 2             DIS_CVA       1                      3
+# 3            MEDI_LPD       0                   5144
+# 4            MEDI_LPD       1                    107
+# 5            DIS_DIAB       0                   5174
+# 6            DIS_DIAB       1                     77
+# 7             DIS_AMI invalid                     NA
+# 8              GENDER       0                   2677
+# 9              GENDER       1                   2574
+# 10 PM_BMI_CATEGORICAL       1                   1540
+# 11 PM_BMI_CATEGORICAL       2                   1989
+# 12 PM_BMI_CATEGORICAL       3                   1475
 }

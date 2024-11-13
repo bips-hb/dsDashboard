@@ -4,19 +4,48 @@
 \alias{dsCatSummary}
 \title{Summary for all non-numeric variables in a DataSHIELD table}
 \usage{
-dsCatSummary(x = NULL, datasources = NULL)
+dsCatSummary(x = NULL, datasources = DSI::datashield.connections_find())
 }
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \code{\link{DSConnection-class}} objects.}
+\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects.}
 }
 \value{
-A data.frame.
+A list of data.frame.
 }
 \description{
 Summary for all non-numeric variables in a DataSHIELD table
 }
 \examples{
-#dsCatSummary("tab1")
+dsCatSummary("tab1")
+# $DIS_CVA
+# level number of observations
+# 1     0                   5248
+# 2     1                      3
+#
+# $MEDI_LPD
+# level number of observations
+# 1     0                   5144
+# 2     1                    107
+#
+# $DIS_DIAB
+# level number of observations
+# 1     0                   5174
+# 2     1                     77
+#
+# $DIS_AMI
+# level number of observations
+# 1 invalid                     NA
+#
+# $GENDER
+# level number of observations
+# 1     0                   2677
+# 2     1                   2574
+#
+# $PM_BMI_CATEGORICAL
+# level number of observations
+# 1     1                   1540
+# 2     2                   1989
+# 3     3                   1475
 }

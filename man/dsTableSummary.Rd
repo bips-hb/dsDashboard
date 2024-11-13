@@ -2,7 +2,7 @@
 % Please edit documentation in R/descriptivetools.R
 \name{dsTableSummary}
 \alias{dsTableSummary}
-\title{Summary for a table in data shield}
+\title{Summary for a table in DataSHIELD}
 \usage{
 dsTableSummary(x = NULL, datasources = NULL)
 }
@@ -15,11 +15,38 @@ dsTableSummary(x = NULL, datasources = NULL)
 A data.frame
 }
 \description{
-Output: variables per server
+Output: number.of.rows, number.of.columns, variables.held for a table object
+per server
 }
 \details{
-The output is more convenient than using the ds.summary function directly.
+The output is more convenient than using the ds.summary function directly,
+as it turns the information in a data.frame.
 }
 \examples{
-#dsTableSummary("tab1")
+if (require(DSLite)) {
+data('CNSIM1')
+data('CNSIM2')
+
+# build a DSLite server with the datasets inside
+library(DSLite)
+dslite.server1 <- DSLite::newDSLiteServer(tables=list(table1=CNSIM1))
+dslite.server2 <- DSLite::newDSLiteServer(tables=list(table2=CNSIM2))
+
+# build DS login information
+builder <- DSI::newDSLoginBuilder()
+builder$append(server = 'server1', driver = 'DSLiteDriver', url = 'dslite.server1')
+builder$append(server = 'server2', driver = 'DSLiteDriver', url = 'dslite.server2')
+logindata <- builder$build()
+
+# do login and table assignment
+conns <- datashield.login(logindata)
+datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
+
+dsTableSummary("tab1")
+}
+
+# output:
+#    server number.of.rows number.of.columns variables.held
+# 1 server1           2163                11   LAB_TSC,....
+# 2 server2           3088                11   LAB_TSC,....
 }
