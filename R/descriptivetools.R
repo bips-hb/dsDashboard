@@ -44,7 +44,7 @@
 #' logindata <- builder$build()
 #'
 #' # do login and table assignment
-#' conns <- datashield.login(logindata)
+#' conns <- DSI::datashield.login(logindata)
 #' datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
 #'
 #' dsTableSummary("tab1")
@@ -959,6 +959,51 @@ dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=datas
 
   # return data
   xyg_df
+}
+
+#' Get two numeric columns and a factor column of a DataShield data.frame in a non-disclosive (k-nearest-neighbor) way.
+#'
+#' This function is basically a wrapper for dsGet_xyg, with slightly different syntax and output.
+#'
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vara A character vector. Names of the variables in the DataShield table.
+#' @param group A character string. Name of the factor variable (group) in the DataShield table object.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param method method	A character string that specifies the method that is used to generated non-disclosive coordinates to be displayed in a scatter plot. This argument can be set as 'deterministic' (method=1) or 'probabilistic' (method=2). Default 'deteministic'.
+#' @param k Numeric. Only used if 'deterministic' method is used. The number of the nearest neighbors for which their centroid is calculated. Default 3.
+#' @param noise Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.
+
+#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @return A data.frame with coloumns for x, y, group g and server (source).
+#' @examples
+#' pair_data <- dsGetPairs("tab1",c("LAB_TSC","LAB_TRIG"),"GENDER")
+#'
+#' head(pair_data)
+#' #      xName    yName        x         y GENDER  server
+#' #  1 LAB_TSC LAB_TRIG 6.379269 1.4462051      0 server1
+#' #  2 LAB_TSC LAB_TRIG 5.427365 4.3632667      0 server1
+#' #  3 LAB_TSC LAB_TRIG 7.877391 3.2380028      0 server1
+#' #  4 LAB_TSC LAB_TRIG 5.521844 2.1337910      0 server1
+#' #  5 LAB_TSC LAB_TRIG 5.139187 2.5045780      0 server1
+#' #  6 LAB_TSC LAB_TRIG 6.204872 0.6240902      0 server1
+#'
+#' # a grouped scatterplot
+#' plot(pair_data$x, pair_data$y, col=as.numeric(pair_data$GENDER)+1)
+dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=datashield.connections_find()) {
+
+  # all possible combinations
+  comb_vars <- as.data.frame(combn(vars,2))
+  # dsGetxy for each combination
+  comb_list <- lapply(comb_vars,
+                      #function(v) data.frame(xName=v[1], yName=v[2], dsAnalysisTools::get_xy(x = paste0(tab,"$",v[1]), y = paste0(tab,"$",v[2]), datasources = datasources)) )
+                      function(v) {
+                        xygdata <- dsAnalysisTools::dsGet_xyg(v[1],v[2],group,tab, datasources = datasources)
+                        data.frame(xName=v[1], yName=v[2],  dplyr::rename(xygdata, x=v[1],y=v[2]) )
+                        } )
+  # rbind list elements
+  comb_df <- do.call("rbind", comb_list)
+  rownames(comb_df) <- NULL
+  return(comb_df)
 }
 
 #' Perform generalized linear model regression in a non-disclosive (k-nearest-neighbor) way.
