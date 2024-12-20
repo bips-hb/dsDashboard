@@ -126,29 +126,35 @@ dsCatVarSummary <- function(x=NULL, datasources=NULL) {
   s_tab <- dsBaseClient::ds.summary(x = x, datasources = datasources)
   # concatenate available categories for the variable as comma separated string
   s_tab <- lapply(s_tab, function(x) {
-    if(class(s_tab[[1]])!="character") x$categories<-paste(x$categories, collapse=",") # otherwise failure with invalid objects
+    if(class(x)!="character")
+      x$categories<-paste(x$categories, collapse=",")
+    else
+      return(data.frame(class=NA, length=NA,categories=NA)) # otherwise failure with invalid objects
     x
   })
-  # add server names to each list element in s_tab
-  s_tab <- lapply(1:length(s_tab), function(x) s_tab[[x]] <- data.frame(server=names(s_tab)[x], s_tab[[x]]))
+  # (1) add server names to each list element in s_tab
+  # (2) remove column "class" before applying data.frame: class might contain several values, e.g. avector,
+  # factor, ordered - to avoid that this creates multiple rows in the data.frame
+  s_tab <- lapply(1:length(s_tab),
+                  function(x) s_tab[[x]] <- data.frame(server=names(s_tab)[x], # new column "server"
+                                                       s_tab[[x]][setdiff(names(s_tab[[x]]),c("class","categories")), drop=F]) # remove column "class" and "categories"
+                  )
   # bind rows to convert list to a flat data.frame
   df <- do.call(dplyr::bind_rows, s_tab)
   # unlist columns that can be simplified (to e.g. numeric, factor,...)
   df <- data.frame(lapply(df, function(x) {if (length(x)==length(unlist(x))) unlist(x) else I(x)}), check.names = F)
   # check if object is too short (an invalid object! has usually at least 5 columns!)
-  if(dim(df)[2]< 5) {
+  if(dim(df)[2]< 3) {
     return(data.frame(id="invalid",length=NA, level="invalid", value=NA))
   }
-  # drop unnecessary columns
-  df <- dplyr::select(df, -class, -categories)
   # reshape: wide to long
   df <- stats::reshape(df, varying=3:length(df),direction="long", v.names = "value", times = names(df)[3:length(df)], timevar = "level", idvar="server")
   # in column "level" replace "count.of..'XXX'." by XXX
   df$level <- gsub("count.of..(.*).", '\\1', df$level)
   # remove rownames
   rownames(df)<-NULL
-  # replace level count NA by 0
-  df$value[is.na(df$value)]<-0
+ # # replace level count NA by 0
+ # df$value[is.na(df$value)]<-0
   # return data.frame
   return(df)
 }
@@ -208,7 +214,7 @@ dsIsNumeric <- function(x=NULL, x.vars=NULL, datasources=DSI::datashield.connect
   # integer and numeric columns are identified as numeric (other types are assumed as categorical variables)
   numCols <- sapply(tbPars,function(tbCol){
     tryCatch({
-      colTypes <<- DSI::datashield.aggregate(datasources, call("classDS",paste0(x,'$',tbCol)))
+      colTypes <- unlist(DSI::datashield.aggregate(datasources, call("classDS",paste0(x,'$',tbCol))))
       return("integer" %in% colTypes | "numeric" %in% colTypes)
     },
     error= function(e) {
@@ -638,7 +644,7 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
 }
 
 
-#' Plot data in a histogram with ggplot2
+#' Plot data in a histogram with R graphics
 #'
 #' @param x A character string referring to a numeric column in a DataSHIELD table.
 #' @param bins either a numeric defining the number of bins or "Sturges" to
@@ -1324,7 +1330,7 @@ dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_f
   summary_g_list <- lapply(subsetTableNames, FUN, datasources=datasources, ...)
   names(summary_g_list) <- subsetTableNames
 
-  # format output: remove unnecessary rownames and joind data.frame objects
+  # format output: remove unnecessary rownames and joint data.frame objects
   rownames(groups) <- NULL
   summary_g_df <- do.call(rbind, Map(cbind, split(groups[,-1,drop=F],seq(nrow(groups))), summary_g_list,     tabname = names(summary_g_list) ) )
   rownames(summary_g_df) <- NULL
@@ -1346,7 +1352,7 @@ dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_f
 #' @param x a string character, specifying the variable
 #' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
 #' @param silent Logical. If TRUE, DataSHIELD errors are suppressed.
-#' @return a data.frame containing the metadata.
+#' @return a matrix containing the metadata.
 #' @export
 #' @examples
 #' \dontrun{
@@ -1490,7 +1496,7 @@ ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
       }
     }
     # join list elements into one data.frame
-    rs <- do.call(rbind,rs)
+    rs <- as.data.frame(data.table::rbindlist(rs, fill=TRUE))
     # set row names to variable names
     rownames(rs) <- gsub("^[^$]+[$]","",x)
   }
@@ -1522,6 +1528,18 @@ ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
 #' # LAB_TRIG           Triglycerides         decimal      Participant               0          0  CONTINUOUS    NA D$LAB_TRIG LAB_TRIG study1,study3
 #' # LAB_HDL          HDL Cholesterol         decimal      Participant               0          0  CONTINUOUS    NA  D$LAB_HDL  LAB_HDL study1,study3
 ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
+  # return empty data.frame if no variables requested
+  if (is.null(x)) return(data.frame(label=character(0),
+                                  opal.value_type=character(0),
+                                  opal.entity_type=character(0),
+                                  opal.repeatable=integer(0),
+                                  opal.index=integer(0),
+                                  opal.nature=character(0),
+                                  class=character(0),
+                                  obj.name=character(0),
+                                  var.name=character(0),
+                                  val = character(0)))
+
   rs <- lapply(x, function(x) dsBetter.metadata(x, datasources) )
 
   # use variable names as list element names
