@@ -71,7 +71,6 @@ dsTableSummary <- function(x=NULL, datasources=NULL) {
 #'
 #' @param x Table name as string.
 #' @param datasources A list of 'OpalConnection'. Default is to use all findable connections.
-#' @param fastmode Deprecated. Should be TRUE.
 #' @param combined If FALSE, the available variables are returned per server, otherwise accross all servers.
 #'
 #' @return A vector.
@@ -80,29 +79,28 @@ dsTableSummary <- function(x=NULL, datasources=NULL) {
 #' # output:
 #'  [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
 #'  [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
-dsUniqueVarnames <- function(x=NULL, datasources=DSI::datashield.connections_find(), fastmode = T, combined=T) {
-  if (fastmode) {
-    # prepare empty dataframe with columns server and variable
-    rs <- data.frame(server=character(),
-                     variable=character())
+dsUniqueVarnames <- function(x=NULL, datasources=DSI::datashield.connections_find(), combined=T) {
+  # if x is not given, return empty character vector
+  if (is.null(x)) return(character(0))
 
-    # Try to call colnamesDS on all specified datasources and return NULL in case of errors.
-    tryCatch(
-      DSI::datashield.aggregate(
-        conns=datasources,
-        expr=call("colnamesDS", x),
-        success=function(server, rs) rs <<- rbind(data.frame(server=server,
-                                                             variable=rs)),
-        error=function(server, e) print(paste0(server,": ", e)),
-      ),
-      error=function(e) NULL
-    )
+  # prepare empty dataframe with columns server and variable
+  rs <- data.frame(server=character(),
+                   variable=character())
 
-    # returns results per datasource (if !combined) or over all datasources (if combined)
-    if (combined) return(unique(rs$variable)) else return(rs)
-  }
-  ## legacy version  below is removed => call error if fastmode=FALSE
-  stop("fastmode=FALSE is not supported any more")
+  # Try to call colnamesDS on all specified datasources and return NULL in case of errors.
+  tryCatch(
+    DSI::datashield.aggregate(
+      conns=datasources,
+      expr=call("colnamesDS", x),
+      success=function(server, rs) rs <<- rbind(data.frame(server=server,
+                                                           variable=rs)),
+      error=function(server, e) print(paste0(server,": ", e)),
+    ),
+    error=function(e) NULL
+  )
+
+  # returns results per datasource (if !combined) or over all datasources (if combined)
+  if (combined) return(unique(rs$variable)) else return(rs)
 }
 
 #' Summary for categorical variable across all servers
@@ -228,7 +226,7 @@ dsIsNumeric <- function(x=NULL, x.vars=NULL, datasources=DSI::datashield.connect
   return(numCols)
 }
 
-#' Summary for all numeric variables in a DataSHIELD table
+#' Summary for all numeric variables in a DataSHIELD table-deprecated
 #'
 #' Quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and mean are computed for all
 #' numeric variables.
@@ -603,8 +601,15 @@ checkDatasources <- function(datasources=DSI::datashield.connections_find()) {
 #' @return A numeric vector (if '"combined" or only 1 study) or a matrix (else).
 #' @examples
 #' getRange("tab1$LAB_TRIG")
+#' #       min       max
+#' # -3.483958 12.128934
 #' getRange("tab1$LAB_TRIG", safemode=T)
+#' #       min       max
+#' # -3.483958 12.128934
 #' getRange("tab1$LAB_TRIG", type="separate", safemode=T)
+#' #               min      max
+#' # server1 -3.483958 12.12893
+#' # server2 -3.331776 12.02544
 getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasources=DSI::datashield.connections_find(), stdnames = names(datasources), method = 1) {
   # get range; loop through studies
   # define the call for getting the range
@@ -643,7 +648,6 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
   return(ranges)
 }
 
-
 #' Plot data in a histogram with R graphics
 #'
 #' @param x A character string referring to a numeric column in a DataSHIELD table.
@@ -668,7 +672,7 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
 #' control that is used for the generation of the histogram. If the value is equal to 1 then (only!) the
 #' 'smallCellsRule' is used. If the value is equal to 2 then the 'deterministic' method is used additionally to method 1 for bins with count zero according to method 1.
 #' If the value is set to 3 then the 'probabilistic' method is used additionally to method 1 for bins with count zero according to method 1.
-#' @return A data.frame containing the table names, server location, symbols and dimensions.
+#' @return A list containing the histogram object.
 #' @examples
 #' ggHistDS("tab1$LAB_TRIG")
 #' ggHistDS("tab1$LAB_TRIG", safemode=T, plot="separate")
@@ -883,7 +887,7 @@ get_xy <- function(x, y, method=1, k=3, noise=0.25, datasources=datashield.conne
 
   # if x is a factor, make it numeric  -- see also: dsResiduals
   x_mod <- x
-  if (any(dsBaseClient::ds.class(x, datasources)=="factor")) {
+  if ("factor" %in% unlist(dsBaseClient::ds.class(x, datasources))) {
     x_mod <- gsub("\\$", "_", x)
     dsBaseClient::ds.asNumeric(x,x_mod,datasources)
   }
@@ -1053,9 +1057,11 @@ dsCallGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binom
   # get unique variable names for table
   tabVariables <- dsAnalysisTools::dsUniqueVarnames(data, datasources=datasources)
   # create full name for dependent variable (TABLENAME$VARIABLENAME instead of just VARIABLENAME)
-  if (dep_var %in% tabVariables) dep_var_mod <- paste0(data,"$",dep_var)
-  # if dependent variable is a factor, make it numeric -- see also functions: get_xy, dsCallGLM, dsResiduals
-  if (any(dsBaseClient::ds.class(dep_var_mod, datasources)=="factor")) {
+  dep_var_mod <- if (dep_var %in% tabVariables) paste0(data,"$",dep_var) else dep_var
+  # for family "Poisson", if dependent variable is a factor, make it numeric
+  # -- see also functions: get_xy, dsCallGLM, dsResiduals
+  if (family == "poisson" &&
+      "factor" %in% unlist(dsBaseClient::ds.class(dep_var_mod, datasources))) {
     dep_var_mod2 <- gsub("\\$", "_", dep_var_mod)
     dsBaseClient::ds.asNumeric(dep_var_mod,dep_var_mod2,datasources)
     formula <- paste(dep_var_mod2 ,"~", tail(unlist(strsplit(formula,split="~")),1) )
@@ -1117,7 +1123,7 @@ dsResiduals <- function(mod, datasources) {
   # if an independent variable is a factor, dummy variables need to be created
   idp_vars <- rownames(attr(terms(formula(mod$formula)),"factors"))[-1]
   for (i in idp_vars) {
-    var_name <- paste0(mod$dataString,"$",i)
+    var_name <- if (i %in% tabVariables) paste0(mod$dataString,"$",i) else i
     if (any(dsBaseClient::ds.class(var_name, datasources)=="factor")) {
       createFactorVars(var_name, datasources=conns)
     }
@@ -1129,7 +1135,7 @@ dsResiduals <- function(mod, datasources) {
 
   # if dependent variable is factor make it numeric # cf. get_xy dsCallGLM dsResiduals
   dep_var_mod <- dep_var
-  if (any(dsBaseClient::ds.class(dep_var, datasources)=="factor")) {
+  if ("factor" %in% unlist(dsBaseClient::ds.class(dep_var, datasources))) {
     dep_var_mod <- gsub("\\$", "_", dep_var)
     dsBaseClient::ds.asNumeric(dep_var,dep_var_mod,datasources)
   }
@@ -1259,6 +1265,15 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
     dep_var <- rownames(attr(terms(formula(mod_glm$formula)),"factors"))[1]
   }
 
+  # if dependent variable is a factor, make a numeric version of it (for get_xy())
+  dep_var_mod <- dep_var
+  if ("factor" %in% unlist(dsBaseClient::ds.class(dep_var_mod, datasources))) {
+    dep_var_mod <- "glmBinomialY"
+    ds.asNumeric(x.name = dep_var,
+                 newobj = dep_var_mod,
+                 datasources = datasources)
+  }
+
   # get non-disclosive predictions, y and residuals using get_xy
   foo <- dsAnalysisTools::get_xy(dep_var,"mod_residuals", datasources=datasources)
   # set slots of the model analogous to the models from `stats::glm`
@@ -1274,6 +1289,12 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
   #mod_glm$qr # for influence function -- but unavailable in the privacy preserving DataSHIELD glm functions
   mod_glm$call <- match.call()
   mod_glm$terms <- terms(formula(formula))
+
+  # rename coefficient table
+  if (family == "gaussian") colnames(mod_glm$coefficients) <- c("Estimate","Std. Error","t-value",
+                                      "p-value","CI Low 95%","CI High 95%")
+
+  # imitate a regular glm object
   class(mod_glm) <- c("lm","glm")
 
   # return model object
@@ -1575,17 +1596,346 @@ ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
   as.data.frame(rs)
 }
 
+#' @title Get range (combined over all servers) for all or some numeric variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function get_hist.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` the features minimum `min` and maximum `max`.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the minimum and maximum for each variable in table tab.
+#' @examples
+#' ds_get_range("D")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'1 bmi_T1   missings 2228
+ds_get_range <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all numeric variables of tab
+    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)
+    vars <- names(vars)[vars==TRUE]
+  }
+
+  # combine ranges from all servers
+  range <- lapply(paste0(tab,"$",vars),
+                  function(x) {
+                    ranges <- unique(unlist(DSI::datashield.aggregate(conns=datasources,
+                                                                      as.symbol(paste0("histogramDS1(", x, ",", method.indicator=1, ",", k=3, ",", noise=0.25, ")")))))
+                    range <- setNames(c(min(ranges, na.rm=TRUE), max(ranges, na.rm=TRUE)), c("min","max"))
+                    range
+                  }
+  )
+
+  # build result
+  # save variables as vector "variable" (such that the resulting data.frame will have its first column named "variable")
+  variable <- vars
+  result <- cbind(variable, do.call(rbind, range))
+  result <- as.data.frame(result)
+  result <- tidyr::pivot_longer(result, !variable, names_to = "feature", values_to = "value")
+}
+
+#' @title Get histogram data (combined for all servers) for all or some numeric variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` the features histograms information including bin positions and sizes.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param bins A numeric. The number of bins for the histogram.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param shiny_notification A logical or integer. If not `FALSE` the parameter specifies the number of seconds that a notification is shown in case of errors.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the histogram data for each variable in table tab.
+#' @examples
+#' ds_get_hist("D", datasources=DSI::datashield.connections_find())
+#' # A tibble: 6 × 3
+#' #   variable feature value
+#' #   <chr>    <chr>   <chr>
+#' # 1 bmi_T1   breaks  [9.8445,11.2128,12.5812,13.9495,15.3179,16.6862,18.0546,19.4229,20.7912,22.1596,23…
+#' # 2 bmi_T1   mids    [10.5287,11.897,13.2653,14.6337,16.002,17.3704,18.7387,20.1071,21.4754,22.8438,24.…
+#' # 3 bmi_T1   counts  [0,7,113,410,434,267,166,88,69,54,23,22,10,9,4,3,0,2,0,0]
+#' # 4 bmi_T1   density [0,0.0018,0.0289,0.1049,0.111,0.0683,0.0425,0.0225,0.0176,0.0138,0.0059,0.0056,0.0…
+#' # 5 bmi_T1   min     11.0884345752723
+#' # 6 bmi_T1   max     35.9674388820484
+ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasources=DSI::datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # if vars is NULL, get_range will automatically choose all numeric variables of tab
+  range <- dsAnalysisTools::ds_get_range(tab, vars=vars, datasources)
+
+  # limit vars to those, for which a range has been returned
+  vars <- unique(range$variable)
+
+  # collect the histogram data for all variables
+  hist_list <- lapply(vars,
+                      function(x) {  tryCatch({  #browser()
+                        var_range <- as.numeric(c(range[range$variable==x & range$feature=="min",]$value, range[range$variable==x & range$feature=="max",]$value))
+                        if (any(!is.finite(var_range)))
+                          return(NA)
+                        else {
+                          # range is widened
+                          safety_range <- 0.05*diff(var_range)
+                          safe_range <- var_range + c(-safety_range,safety_range)
+                          dsAnalysisTools::ggHistDS(paste0(tab,"$",x), plot=F,
+                                                    datasources = datasources, bins=bins,
+                                                    range=safe_range
+                          )
+                        }
+                      }, error = function(cond) {
+                        error_message <- paste("density not permitted for ",x,"in table ",tab)
+                        if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
+                        message(paste("get_hist:",conditionMessage(cond))); message(datashield.errors()); NA
+                      }) }
+  )
+
+  # filter for variables with histogram data
+  vars <- vars[!is.na(hist_list)]
+  hist_list <- hist_list[!is.na(hist_list)]
+  if (length(hist_list)==0) return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+
+  # build result
+  breaks_json <- lapply(hist_list, function(server) jsonlite::toJSON( server$combined$histobject$breaks ) ) %>% setNames(vars) %>% (function(x) do.call(rbind, x))() %>% as.data.frame() %>% setNames("breaks")
+  mids_json <- lapply(hist_list, function(server) jsonlite::toJSON( server$combined$histobject$mids ) ) %>% setNames(vars) %>% (function(x) do.call(rbind, x))() %>% as.data.frame() %>% setNames("mids")
+  counts_json <- lapply(hist_list, function(server) jsonlite::toJSON( server$combined$histobject$counts ) ) %>% setNames(vars) %>% (function(x) do.call(rbind, x))() %>% as.data.frame() %>% setNames("counts")
+  density_json <- lapply(hist_list, function(server) jsonlite::toJSON( server$combined$histobject$density ) ) %>% setNames(vars) %>% (function(x) do.call(rbind, x))() %>% as.data.frame() %>% setNames("density")
+  result <- cbind(breaks_json, mids_json, counts_json, density_json, data.frame(variable=vars))
+  result <-  tidyr::pivot_longer(result, cols = -variable, names_to="feature", values_to = "value")
+  result <- rbind(result, range)
+  return(result)
+}
+
+#' @title Get variance (combined for all servers) for all or some numeric variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` the variance.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param bins A numeric. The number of bins for the histogram.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the histogram data for each variable in table tab.
+#' @examples
+#' ds_get_variance("D")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'  1 bmi_T1   missings 2228
+ds_get_variance <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all numeric variables of tab
+    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
+    vars <- names(vars)[vars==TRUE]
+  }
+
+  # for all variables in vars get variance
+  all_variances <- lapply(paste0(tab,"$",vars),
+                          function(x) {
+                            tryCatch({
+                              variances <- dsBaseClient::ds.var(x = x, type = "combined", checks = F, datasources=datasources)
+                              global_variance <- variances$Global.Variance["studiesCombined",]
+                              global_variance %>% as.list() %>% data.frame() %>% dplyr::rename(var=EstimatedVar) %>% dplyr::mutate(sd=sqrt(var))
+                            }, error = function(cond) {
+                              message(paste("get_variance error for",x,"-",conditionMessage(cond))); message(datashield.errors()); NA })
+                          }
+  )
+
+  # filter out variables for which no variance could be determined
+  all_variances <- all_variances[!is.na(all_variances)]
+  if (length(all_variances)==0) return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+
+  # save variable names in `variables` (which will be the name of the resulting data.frame below)
+  variable <- vars
+  #build result
+  all_variances <- cbind(variable, do.call(rbind,all_variances))
+  all_variances <- tidyr::pivot_longer(all_variances, !variable, names_to = "feature", values_to = "value")
+
+  return(all_variances)
+}
+
+#' @title Get quantiles and mean (separate or combined for all servers) for one numeric variable
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function get_quantile_mean.
+#'
+#' It returns for the requested variable (`X`) from the
+#' `datasources` the quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and the mean.
+#' @param X A character string. The name of the DataShield object.
+#' @param  combine Logical. If TRUE the results over all servers are combined. Otherwise results are returned for each server separately.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the histogram data for each variable in table tab.
+#' @examples
+#' ds_quantileMean("D$LAB_TSC")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'  1 bmi_T1   missings 2228
+ds_quantileMean <- function(x, combine=T, datasources=datashield.connections_find() ){
+  # aggregate data with quantileMeanDS to get the quantiles
+  quants <- DSI::datashield.aggregate(datasources, as.symbol(sprintf("quantileMeanDS(%s)", x)))
+  # convert list to data.frame
+  quants <- do.call(rbind,quants)
+  # if not combine then return this
+  if (!combine) return(quants)
+
+  # otherwise combine quantiles as weighted sum and return combined results
+  lengths <- unlist(DSI::datashield.aggregate(datasources, call('lengthDS', x)))
+  numNAs <- unlist(DSI::datashield.aggregate(datasources, as.symbol( sprintf("numNaDS(%s)", x) )) )
+  apply( quants*(lengths-numNAs), 2, sum ) / (sum(lengths)-sum(numNAs))
+}
+
+#' @title Get quantiles and mean (combined or seperate for all servers) for all or some numeric variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` the quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and the mean.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param  combine Logical. If TRUE the results over all servers are combined. Otherwise results are returned for each server separately.
+#' @param tidy Logical. If tidy (and combine not FALSE), then the result is formatted as a data.frame, otherwise results for each variable are returned as elements of a list.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the histogram data for each variable in table tab.
+#' @examples
+#' ds_get_quantile_mean("D")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'  1 bmi_T1   missings 2228
+ds_get_quantile_mean <- function(tab, vars=NULL, combine=T, tidy=T, datasources=datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all numeric variables of tab
+    vars <- dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
+    vars <- names(vars)[vars==TRUE]
+  }
+  # for vars in tab get quantiles and mean
+  all_quantiles_mean <- lapply(paste0(tab,"$",vars),
+                               function(x) {
+                                 ds_quantileMean(x = x, combine=combine, datasources=datasources)
+                               }
+  )
+  all_quantiles_mean <- setNames(all_quantiles_mean, paste0(tab,"$",vars))
+
+  # if a list instead of a tidy long table is preferred, return this
+  if (!combine || !tidy) return(all_quantiles_mean)
+
+  # ohterwise return a tidy data.frame
+  do.call(rbind,all_quantiles_mean) %>% as.data.frame() %>% dplyr::mutate(variable=vars)  %>%
+    tidyr::pivot_longer(!variable,names_to = "feature", values_to = "value")
+}
+
+#' @title Get number of missing variables for all or some specified variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources`  either "numeric" if the variable is numeric or "categorical"
+#' if the variable is a factor or character string.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the number of missing values for each variable in table tab.
+#' @examples
+#' ds_get_NA("D", datasources=DSI::datashield.connections_find())
+#' # A tibble: 11 × 3
+#'    variable           feature  value
+#'    <chr>              <chr>    <chr>
+#'  1 LAB_TSC            missings 1005
+#'  2 LAB_TRIG           missings 1017
+#'  3 LAB_HDL            missings 1015
+#'  4 LAB_GLUC_ADJUSTED  missings 950
+#'  5 PM_BMI_CONTINUOUS  missings 302
+#'  6 DIS_CVA            missings 0
+#'  7 MEDI_LPD           missings 0
+#'  8 DIS_DIAB           missings 0
+#'  9 DIS_AMI            missings 0
+#' 10 GENDER             missings 0
+#' 11 PM_BMI_CATEGORICAL missings 302
+ds_get_NA <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
+
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all variables of tab
+    vars <- dsIsNumeric(tab, vars, datasources=datasources)
+    vars <- names(vars)#[vars==TRUE]  # use both, numeric and not numeric
+  }
+  # for each variable get NAs
+  all_missings <- lapply(paste0(tab,"$",vars),
+                         function(x) {
+                           n_missings <- sum(unlist(DSI::datashield.aggregate(conns=datasources,
+                                                                              as.symbol(paste0("numNaDS(", x, ")")))))
+                           n_missings
+                         }
+  )
+  # combine results from all servers
+  all_missings <- cbind(vars, do.call(rbind,all_missings))
+  all_missings <- as.data.frame(all_missings)
+  all_missings <- setNames(all_missings, c("variable","missings"))
+  all_missings <- tidyr::pivot_longer(all_missings, !variable, names_to = "feature", values_to = "value")
+
+  return(all_missings)
+}
 
 #' @title Get variable type as string ("numeric" or "categorical") for all variables of a table in unified form
 #'
-#' @description The main purpose of this function is to be a helper function for the function all_summaries.
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#' It eturns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources`  either "numeric" if the variable is numeric or "categorical"
+#' if the variable is a factor or character string.
 #' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
 #' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
 #' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
 #' @return A data.frame containing the data type for each variable in table tab.
 #' @examples
-#' get_type("D",DSI::datashield.connections_find())
+#' ds_get_type("D", datasources=DSI::datashield.connections_find())
 #' # # A tibble: 11 × 3
 #' #    variable           feature value
 #' #    <chr>              <chr>   <chr>
@@ -1600,9 +1950,14 @@ ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
 #' #  9 DIS_AMI            type    categorical
 #' # 10 GENDER             type    categorical
 #' # 11 PM_BMI_CATEGORICAL type    categorical
-get_type <- function(tab, datasources=DSI::datashield.connections_find()) {
+ds_get_type <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
   # for each variable get type
-  vars0 <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)
+  vars0 <- dsIsNumeric(tab, vars, datasources=datasources)
 
   # recode the logical values to "numeric" and "categorical"
   vars <- vars0
@@ -1616,7 +1971,267 @@ get_type <- function(tab, datasources=DSI::datashield.connections_find()) {
 
   rs
 }
-#
+
+#' @title Get (ungrouped) boxplot data (combined) for all or some numeric variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` the boxplot data (for ungrouped boxplots only).
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the boxplot data for each variable in table tab.
+#' @examples
+#' ds_get_boxplot_data("D")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'  1 bmi_T1   missings 2228
+ds_get_boxplot_data <- function(tab, vars=NULL, datasources=datashield.connections_find()) {
+  # if length of vars is 0 then return nothing
+  if (!is.null(vars) && length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all numeric variables of tab
+    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
+    vars <- names(vars)[vars==TRUE]
+  }
+
+  # for all variables in vars get boxplot data
+  all_boxplots <- lapply(paste0(tab,"$",vars),
+                         function(x) {
+                           # get boxplot data from DataSHIELD
+                           cally <- sprintf("boxPlotGG_data_Treatment_numericDS(%s)", x)
+                           DSI::datashield.assign.expr(datasources, "boxPlotRawDataNumeric", as.symbol(cally))
+                           cally <- sprintf("boxPlotGGDS(%s, NULL, NULL)", "boxPlotRawDataNumeric" )
+                           # Initialize empty object "pt" in case of failure of the following try block
+                           pt <- list(x =list(data = data.frame(x=x,ymin=NA,lower=NA,middle=NA,upper=NA,ymax=NA,n=NA)) ); names(pt)<- x
+                           # request the boxplot data
+                           tryCatch({  pt <- DSI::datashield.aggregate(datasources, as.symbol(cally)) },
+                                    error = function(cond) {
+                                      showNotification(paste("boxplot not permitted for ",x,"in table ",tab), duration=globals$notification_duration)
+                                      message(conditionMessage(cond));  message(datashield.errors())
+                                    }  )
+                           # pool data from different servers by weighted means
+                           pt_merged <- lapply(pt, function(x) x$data) %>%
+                             (function(x) do.call(rbind,x))() %>%
+                             data.table::data.table()
+                           # no groups are currently supported
+                           group <- group2 <- NULL
+                           pt_merged <- panelaggregation::computeWeightedMeans(pt_merged,
+                                                                               variables = c("ymin", "lower", "middle", "upper", "ymax"),
+                                                                               weight = "n",
+                                                                               by = unlist(list("x",
+                                                                                                if(!is.null(group)) "group",
+                                                                                                if(!is.null(group2)) "group2")))
+                           pt_merged
+                         }
+  )
+  # return result
+  do.call(rbind,all_boxplots) %>% dplyr::mutate(variable=vars) %>% dplyr::select(-x) %>%
+    tidyr::pivot_longer(!variable,names_to = "feature", values_to = "value")
+}
+
+#' @title Get summary statistics for all or some categorical variables of a table in unified form
+#'
+#' @description The main purpose of this function is to be a helper function
+#' for the function all_summaries.
+#'
+#' It returns for each of the requested variables (`vars`) in table `tab` from the
+#' `datasources` summary statistics such as the number of observations (total, valid and missings),
+#' the levels (level labels, and number of observations per level) and the mode.
+#' @param tab A character string. Name of the DataShield table object.
+#' @param vars A vector of character strings. Names of the variables in the table object `tab`.
+#' @param check Logical. If FALSE, then the check for nonnumerical variables is skipped. This will
+#' lead to errors, if numeric variables are included in the parameter vars.
+#' @param shiny_notification A logical or integer. If not `FALSE` the parameter specifies the number
+#' of seconds that a notification is shown in case of errors.
+#' @param n_levels Integer value. If known in advance, the number of possible level values can be given.
+#' This can help to get reliable results in more cases.
+#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
+#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' @return A data.frame containing the boxplot data for each variable in table tab.
+#' @examples
+#' ds_get_cat_summary("D")
+#' # A tibble: 1 × 3
+#'  variable feature  value
+#'  <chr>    <chr>    <chr>
+#'  1 bmi_T1   missings 2228
+ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_levels=NULL, datasources=datashield.connections_find()) {
+
+  # get names of categoricl variables in table tab (if no variable selection is given in vars / or if check==TRUE)
+  if (check || is.null(vars)) {
+    vars_numeric <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)
+    categorical_vars <- names(vars_numeric)[vars_numeric==FALSE]
+  }
+
+  # if no variable selection is given in vars...
+  if (is.null(vars)) {
+    # .. then choose all non-numeric variables of tab
+    vars <- categorical_vars
+  } else {
+    # filter to make sure that all variables in var are categorical
+    vars <- intersect(vars, categorical_vars)
+  }
+
+  # if length of vars is 0 then return nothing
+  if (length(vars)==0) {
+    return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
+  }
+
+  # for all variables in vars get summary statistics
+  all_cat_summary <- lapply(vars,
+                            function(x) {
+                              # initialize result as NULL (in case that computation below fails)
+                              in_lapply_result <- NULL
+
+                              # save the variable name in x_name and the full object name in x
+                              x_name <- x
+                              x <- paste0(tab,"$",x)
+
+                              # determine Ntotal, Nmissing, Nvalid
+                              Ntotal   <- sum(unlist(DSI::datashield.aggregate(datasources, call('lengthDS', x))))
+                              N_missing <- sum(unlist(DSI::datashield.aggregate(datasources, as.symbol(paste0("numNaDS(", x, ")")))))
+                              N_valid   <- Ntotal - N_missing
+
+                              # if any server has valid data on the variable...
+                              n_valid_servers <- sum(unlist(DSI::datashield.aggregate(datasources, as.symbol(paste0('isValidDS(', x, ')')))))
+                              if (n_valid_servers > 0) {
+                                # warn if some servers have no valid data
+                                if (n_valid_servers < length(datasources)) {
+                                  error_message <- paste0("Counts for variable ",x_name , " in table ",tab," might be incorrect!")
+                                  warning(error_message)
+                                  if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
+                                }
+
+                                # for level based summaries the table1DDS function can be used (attention: no output if levels have size smaller than nfilter.tab)
+                                rs <- lapply(datasources, function(src) {
+                                  tryCatch({
+                                    DSI::datashield.aggregate(src, as.symbol(paste0('table1DDS(', x, ')' )))$table
+                                  }, error=function(x) { return(NULL) })
+                                })
+
+                                # extract levels
+                                var_levels <- lapply( rs, function(x) head(colnames(x),-1) ) %>% # head(.,-1) because last column is "Total"
+                                  unlist() %>% unique() %>%
+                                  sort() # sort makes sense, because levels are 1,2,3,...
+                                # levels with positive count or unknown count NA
+                                used_levels <- rs[[1]] %>% dplyr::select(-length(.)) %>% as.numeric() %>%
+                                  setNames(var_levels) %>% (function(x) is.na(x) | x>0)() %>% .[.!=F] %>%
+                                  names() %>% unique() %>% sort()
+                                # number of distinct (used) levels
+                                Ndistinct <- length(used_levels)
+                                # levels_json: all possible levels (also levels with count zero) (as JSON)
+                                levels_json <- jsonlite::toJSON(var_levels)
+                                # used_levels_json: levels with at least one observation (as JSON)
+                                used_levels_json <- jsonlite::toJSON(used_levels)
+
+                                # build a tidy result
+                                in_lapply_result <- rs %>%
+                                  (function(x) do.call(rbind,x))()  %>%
+                                  dplyr::summarise_all(sum) %>%   # sum up level counts over all servers
+                                  dplyr::mutate(   # determine count for largest level and mode
+                                    max_group_n= {if (max(dplyr::select(., !!1:length(var_levels) ), na.rm=T)>0)
+                                      max(dplyr::select(., !!1:length(var_levels) ), na.rm=T)
+                                      else
+                                        max(dplyr::select(., !!1:length(var_levels) ), na.rm=F)}, # max_group_n considering NAs due to privacy
+                                    mode = {if (is.na(max_group_n) | max_group_n==0)
+                                      NA
+                                      else
+                                        jsonlite::toJSON(names(dplyr::select(., !!1:length(var_levels) ))[which(.==max_group_n)]  ) } ) %>%
+                                  dplyr::select(-Total) %>% #dplyr::rename(Nvalid=Total) %>% # ok for levels 1,2,3,... (would be problematic if there was a factor level named "Total")
+                                  dplyr::mutate(Ndistinct=Ndistinct,
+                                                Ntotal=Ntotal,
+                                                Nmissing=N_missing,
+                                                Nvalid = N_valid, # this overwrites Nvalid=Total (should not change its value)
+                                                levels=levels_json,
+                                                used_levels=used_levels_json)
+                              } else {
+                                # fallback: for level based summaries use histogram function
+                                tryCatch({
+                                  # make categorical variable numeric, so we can use the histogram functions
+                                  ds.asNumeric(x, "num.obj", datasources)
+
+                                  # extract levels 1,2,...
+                                  if (!is.null(n_levels)) {
+                                    var_levels <- 1:n_levels
+                                  } else {
+                                    # guess the number of levels based on blurred data
+                                    range_method1 <- getRange("num.obj", safemode=T, datasources=datasources, method=1)
+                                    max_limits <- c(range_method1["max"]/1.05,range_method1["max"]/1.01)
+                                    # check if result is reliable
+                                    if (diff(max_limits) > 1) {
+                                      warn_message <- paste("guessed number of levels for",x_name,"is not reliable")
+                                      warning(warn_message)
+                                      if (is.numeric(shiny_notification)) showNotification(warn_message, duration=shiny_notification)
+                                    }
+                                    var_levels <- 1:mean(max_limits)
+                                  }
+
+                                  # get range for pseudo-numeric version of the categorical variables
+                                  f_range <- setNames(c(1,length(var_levels)) + c(-0.5,0.5), c("min","max"))
+                                  # create histogram according to small cells rule
+                                  histobj <- dsAnalysisTools::ggHistDS("num.obj",	bins=diff(f_range), plot=F, datasources = datasources, range=f_range, improveplot = F)
+                                  ##   to make it more exact we could increase the range so that the automatical correction for bins with few obs can be more often generated...
+                                  rs <- histobj$combined$histobject$counts %>% setNames(var_levels)
+                                  rs[rs==0] <- NA
+                                  used_levels <- rs[!is.na(rs)] %>% names()
+                                  Ndistinct <- paste0("≥",length(used_levels))
+                                  used_levels <- c(used_levels,"...")
+                                  levels_json <- jsonlite::toJSON(as.character(var_levels))
+                                  used_levels_json <- jsonlite::toJSON(used_levels)
+
+                                  in_lapply_result <- setNames(rs, 1:length(rs)) %>% t() %>% as.data.frame() %>%
+                                    dplyr::mutate(
+                                      max_group_n= {if (max(dplyr::select(., !!1:length(var_levels) ), na.rm=T)>0)
+                                        max(dplyr::select(., !!1:length(var_levels) ), na.rm=T)
+                                        else
+                                          max(dplyr::select(., !!1:length(var_levels) ), na.rm=F)}, # max_group_n considering NAs due to privacy
+                                      mode = {if (is.na(max_group_n) | max_group_n==0)
+                                        NA
+                                        else
+                                          jsonlite::toJSON(names(dplyr::select(., !!1:length(var_levels) ))[which(.==max_group_n)]  )} )  %>%
+                                    dplyr::mutate(Ndistinct=Ndistinct,
+                                                  Ntotal=Ntotal,
+                                                  Nmissing=N_missing,
+                                                  Nvalid = N_valid,
+                                                  levels=levels_json,
+                                                  used_levels=used_levels_json)
+                                },
+                                # it will fail, if the DataSHIELD options are too strict or anything unexpected happens
+                                error = function(cond) {
+                                  # show warnings/errors
+                                  warning(paste("summary for categorical variable",x,"failed"))
+                                  warning(conditionMessage(cond))
+                                  warning(datashield.errors())
+                                  error_message <- paste("Restricted output for variable",x,"due to privacy parameters")
+                                  if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
+
+                                  # build empty result
+                                  in_lapply_result <<- data.frame(
+                                    max_group_n=NA, mode = NA, Ndistinct=NA, Ntotal=Ntotal, Nmissing=N_missing, Nvalid=N_valid, levels=NA, used_levels=NA
+                                  )
+                                  return(in_lapply_result)
+                                })
+                              }
+                              return(in_lapply_result)
+                            }
+  )
+  # add variable
+  all_cat_summary <- lapply(1:length(vars), function(x) all_cat_summary[[x]] %>% dplyr::mutate(variable=vars[x]))
+  all_cat_summary <- lapply(all_cat_summary, function(x) x %>% dplyr::mutate(dplyr::across(dplyr::everything(), as.character))  %>% tidyr::pivot_longer(!variable,names_to = "feature", values_to = "value") )
+
+  # build result
+  do.call(rbind, all_cat_summary)
+}
 
 #' @title Return boxplot data
 #'
