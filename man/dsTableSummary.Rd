@@ -28,7 +28,6 @@ data('CNSIM1')
 data('CNSIM2')
 
 # build a DSLite server with the datasets inside
-library(DSLite)
 dslite.server1 <- DSLite::newDSLiteServer(tables=list(table1=CNSIM1))
 dslite.server2 <- DSLite::newDSLiteServer(tables=list(table2=CNSIM2))
 
@@ -39,7 +38,7 @@ builder$append(server = 'server2', driver = 'DSLiteDriver', url = 'dslite.server
 logindata <- builder$build()
 
 # do login and table assignment
-conns <- datashield.login(logindata)
+conns <- DSI::datashield.login(logindata)
 datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
 
 dsTableSummary("tab1")

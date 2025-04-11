@@ -7,7 +7,6 @@
 dsUniqueVarnames(
   x = NULL,
   datasources = DSI::datashield.connections_find(),
-  fastmode = T,
   combined = T
 )
 }
@@ -15,8 +14,6 @@ dsUniqueVarnames(
 \item{x}{Table name as string.}
 
 \item{datasources}{A list of 'OpalConnection'. Default is to use all findable connections.}
-
-\item{fastmode}{Deprecated. Should be TRUE.}
 
 \item{combined}{If FALSE, the available variables are returned per server, otherwise accross all servers.}
 }

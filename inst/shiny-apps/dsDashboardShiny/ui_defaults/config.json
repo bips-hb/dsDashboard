@@ -1,0 +1,10 @@
+{
+  "login_default_servers": ["https://mein-opal-server-1.de", "https://mein-opal-server-2.de"],
+  "login_default_profile": "default",
+  "login_default_user": "default_user",
+  "login_default_passwort": "default_password",
+  "login_default_token": "my_login_token",
+  "login_token_selected": true,
+  "header_title": "dsDashboard",
+  "header_title_width": 250
+}

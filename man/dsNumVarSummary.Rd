@@ -2,7 +2,7 @@
 % Please edit documentation in R/descriptivetools.R
 \name{dsNumVarSummary}
 \alias{dsNumVarSummary}
-\title{Summary for all numeric variables in a DataSHIELD table}
+\title{Summary for all numeric variables in a DataSHIELD table-deprecated}
 \usage{
 dsNumVarSummary(x = NULL, datasources = DSI::datashield.connections_find())
 }

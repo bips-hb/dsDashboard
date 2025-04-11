@@ -19,9 +19,9 @@ Summary for one (and only one!) categorical variable of a table across all serve
 }
 \examples{
 dsCatAgg("tab1$GENDER")
-  GENDER number of observations
-1      0                   2677
-2      1                   2574
+#   GENDER number of observations
+# 1      0                   2677
+# 2      1                   2574
 
 dsCatAgg("tab1$DIS_AMI")
 #   DIS_AMI number of observations

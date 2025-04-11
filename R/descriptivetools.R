@@ -809,8 +809,12 @@ ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq
 dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connections_find()) {
   # if table is given separately build the complete variable object string
   if (!is.null(tab)) var <- paste0(tab,"$",var)
-  # get levels using DataSHIELD
-  levs <- DSI::datashield.aggregate(conns=datasources, paste0("levelsDS(",var,")"))
+  # get levels using DataSHIELD (even if some but not all datasources fail)
+  #levs <- DSI::datashield.aggregate(conns=datasources, paste0("levelsDS(",var,")"))
+  levs <- lapply(datasources, function(x) tryCatch({ DSI::datashield.aggregate(conns=x, paste0("levelsDS(",var,")")) }, error = function(cond) {
+    message(conditionMessage(cond))
+    NULL
+  }))
   # join all data.frames into one
   levs_df <- do.call(dplyr::bind_rows, levs)
   # only return unique values from all datasources
@@ -829,10 +833,18 @@ dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connection
 #' # then these new tables canbe used, e.g. for a plot:
 #' ggHistDS("tab1.PM_BMI_CATEGORICAL.1$LAB_TRIG")
 dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.connections_find()) {
+  # make sure only datasources with available table tab are used
+  datasources <- datasources[unlist(ds.exists(tab, datasources))]
+  if (length(datasources)<1) return(NA)
+
   levs <- dsUniqueLevels(var, tab, datasources)
   df_sub <- lapply(levs, function(x) {
     tryCatch({
       sub_tab_name <- paste0(tab,".",var,".",x)
+
+      # if any datasource works, return the object name in sub_tab_name, otherwise return NA
+      datasources_check <- rep(TRUE, length(datasources))
+
       if (!lazy || (sum(unlist(DSI::datashield.aggregate(datasources, call("exists", sub_tab_name)))) < 1)   ) {
         dsBaseClient::ds.Boole(V1 = paste0(tab,"$",var),
                  V2 = x,
@@ -840,13 +852,23 @@ dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.con
                  numeric.output = TRUE,
                  newobj = paste0(tab,".",var,".",x,".bool"),
                  datasources = datasources)
-        dsBaseClient::ds.dataFrameSubset(df.name = tab,
-                           V1.name = paste0(tab,".",var,".",x,".bool"), #paste0(tab,"$",var),
-                           V2.name = "1",
-                           Boolean.operator = "==",
-                           newobj = sub_tab_name,
-                           datasources = datasources)
+        for (i in 1:length(datasources)) {
+          datasources_check[i] <- FALSE
+          tryCatch({
+            dsBaseClient::ds.dataFrameSubset(df.name = tab,
+                                             V1.name = paste0(tab,".",var,".",x,".bool"),
+                                             V2.name = "1",
+                                             Boolean.operator = "==",
+                                             newobj = sub_tab_name,
+                                             datasources = datasources[i])
+            datasources_check[i] <- TRUE
+          },
+          error = function(cond) {
+            message(conditionMessage(cond))
+          })
+        }
       }
+      if (!any(datasources_check)) sub_tab_name <- NA
       sub_tab_name
     },
     error = function(cond) {
@@ -976,7 +998,7 @@ dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=datas
 #' This function is basically a wrapper for dsGet_xyg, with slightly different syntax and output.
 #'
 #' @param tab A character string. Name of the DataShield table object.
-#' @param vara A character vector. Names of the variables in the DataShield table.
+#' @param vars A character vector. Names of the variables in the DataShield table.
 #' @param group A character string. Name of the factor variable (group) in the DataShield table object.
 #' @param tab A character string. Name of the DataShield table object.
 #' @param method method	A character string that specifies the method that is used to generated non-disclosive coordinates to be displayed in a scatter plot. This argument can be set as 'deterministic' (method=1) or 'probabilistic' (method=2). Default 'deteministic'.
@@ -1115,21 +1137,39 @@ dsResiduals <- function(mod, datasources) {
 ####  matches <- grepl(pattern, names(tail(est,-1)))
   matches <- names(tail(est,-1)) %in% tabVariables
   addTabName <- c(FALSE, matches)
-  names(est)[addTabName] <- paste0(mod$dataString,"$",names(est)[addTabName])
+  # only if dataString is given and object names with missing table exist
+  if (!is.null(mod$dataString) && length(names(est)[addTabName])>0)
+    names(est)[addTabName] <- paste0(mod$dataString,"$",names(est)[addTabName])
   # get and adapt name for dependent variable
   dep_var <- rownames(attr(terms(formula(mod$formula)),"factors"))[1]
-  if (dep_var %in% tabVariables) dep_var <- paste0(mod$dataString,"$",dep_var)
+  if (!is.null(mod$dataString) && dep_var %in% tabVariables) dep_var <- paste0(mod$dataString,"$",dep_var)
 
   # if an independent variable is a factor, dummy variables need to be created
   idp_vars <- rownames(attr(terms(formula(mod$formula)),"factors"))[-1]
   for (i in idp_vars) {
-    var_name <- if (i %in% tabVariables) paste0(mod$dataString,"$",i) else i
-    if (any(dsBaseClient::ds.class(var_name, datasources)=="factor")) {
-      createFactorVars(var_name, datasources=conns)
+    var_name <- if (!is.null(mod$dataString) && i %in% tabVariables) paste0(mod$dataString,"$",i) else i
+    if (any(sapply(dsBaseClient::ds.class(var_name, datasources), function(x) "factor" %in% x))) {
+      createFactorVars(var_name, datasources=datasources)
     }
   }
 
   # build formula for residuals
+  # in case that
+  # 1. mod is created with complete object names in the formula (tablename$variable) and
+  # 2. at least one independent variable is a factor
+  # the derived dummy factors have no prefix "tablename$"
+  # therefore it has to be removed for the corresponding derived dummy variables
+  ori_termnames <- attr(terms(formula(mod$formula)),"term.labels")
+  new_names <- sapply(names(est)[-1], function(x) if (!x %in% ori_termnames & any(startsWith(x, ori_termnames)) ) {
+      # get variable name from x without table name & "$"
+      tail(unlist(strsplit(x,split="\\$")),1)
+    } else x ) %>% unname()
+  # names with "^" (e.g. "variablename^4" for polynomial contrasts of degree 4 and above)
+  # cannot be created above in createFactorVars
+  # therefore replace "^" by ".deg
+  new_names <- gsub("\\^", ".deg", new_names)
+  names(est) <- c(names(est)[1],new_names)
+
   estBRACKETS <- paste0("(",est,")")
   estPRODUCTS <- paste0(estBRACKETS,"*",names(est))
 
@@ -1142,13 +1182,11 @@ dsResiduals <- function(mod, datasources) {
 
   # build up formula for residuals
   formula <- paste0(dep_var_mod,"-",paste0(estPRODUCTS,collapse="-"))
-  message(paste("COMPUTE RESIDUALS:", formula))
   # compute residuals and save them as mod_residuals
   dsBaseClient::ds.make(toAssign=formula, newobj = "mod_residuals", datasources = datasources)
 
   # build up formula for predicted values
   formula2 <- paste0(paste0(estPRODUCTS,collapse="+"))
-  message(paste("PREDICT VALUES:", formula2))
   # predict values and save them in mod_predicted
   dsBaseClient::ds.make(toAssign=formula2, newobj = "mod_predicted", datasources = datasources)
 }
@@ -1180,14 +1218,15 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
   varname <- tail(unlist(strsplit(x,split="\\$")),1)
 
   # check if x is a factor
-  isFactor <- all(dsBaseClient::ds.class(x, datasources = datasources) == "factor")
+  isFactor <- all(sapply(dsBaseClient::ds.class(x, datasources = datasources), function(x) "factor" %in% x))
+  isOrdered <- all(sapply(dsBaseClient::ds.class(x, datasources = datasources), function(x) "ordered" %in% x))
 
   # if x is not a factor, turn it into a factor (new name: tempname)
   if (!isFactor) {
     tempname <- gsub("\\$", "_", x)
     dsBaseClient::ds.asFactor(input.var.name = x,
                 newobj.name = tempname,
-                datasources = datasources) # datasources = conns) #!!!!!!!!!!!!!!!conns??
+                datasources = datasources)
     x <- tempname
   }
 
@@ -1202,7 +1241,28 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
              numeric.output = TRUE,
              newobj = paste0(varname,fLevels[i]),
              datasources = datasources)
-  }  )
+  })
+
+  # create variables for polynomial contrasts (if ordered)
+  if (isOrdered) {
+    poly_contrasts <- contrasts(ordered(NULL,levels=1:length(fLevels)))
+    dummy_names <- paste0(varname,fLevels)
+    lapply(1:length(colnames(poly_contrasts)), function(i) {
+      # get current suffixes and coefficients
+      curr_suff <- colnames(poly_contrasts)[i]
+      # for the new objects "^" must not be in the object name for dsBaseClient::ds.make
+      # therefore replace by ".deg"
+      curr_suff <- gsub("\\^", ".deg", curr_suff)
+      curr_coeff <- poly_contrasts[, i]
+      # build the formula
+      formula <- paste0("(",curr_coeff,"*",dummy_names,")", collapse="+")
+      # construct the variables using polynomial contrasts
+      dsBaseClient::ds.make(toAssign=formula,
+                            newobj = paste0(varname,curr_suff),
+                            datasources = datasources)
+    })
+  }
+
 }
 
 #' Perform generalized linear model regression and return the model object
@@ -1331,20 +1391,31 @@ dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_f
   # initialize subsetTableNames with original tab name...
   subsetTableNames <- x
   groups <- data.frame(dummy=1)
+  groups_tabname <- x
+
   # for each group variable...
   for (i in seq_along(G)){
     # ...create subsets of the table x for each distinct group value
     subsetTableNames <- as.vector(sapply(subsetTableNames,
-                                         function(x) if(is.na(x)) NA else dsSubsetLevels(G[i], x, lazy=lazy, datasources=datasources)$`created subsets`)) # if could probably be removed, because there should be no NA
+                                         function(x) if(is.na(x)) NA else dsSubsetLevels(G[i], x, lazy=lazy, datasources=datasources)$`created subsets`)) # if, because dsSubsetLevels might return NA in case of failure
+    subsetTableNames <- unname(unlist(subsetTableNames))
     # -> table names are composed by tab, G and level, e.g.: "tab1.GENDER.0" "tab1.GENDER.1"
 
     # remember groupwise levels in that same order and save them in data.frame groups
     levelsGi <- dsUniqueLevels(G[i], x, datasources=datasources)
 
     groups <- groups[rep(seq_len(nrow(groups)),each=length(levelsGi)), ,drop=F]
-    groups[[G[i]]] <- rep(levelsGi, length.out=length(subsetTableNames))
-    # remove where NA
-    groups <- groups[!is.na(subsetTableNames),,drop=F]
+    #groups[[G[i]]] <- rep(levelsGi, length.out=length(subsetTableNames))
+    groups[[G[i]]] <- rep(levelsGi, length.out=nrow(groups))
+
+    # update groups_tabname
+    groups_tabname <- paste0(rep(paste0(groups_tabname,".",G[i],"."), each=length(levelsGi)),
+                             levelsGi)
+
+    ## remove where NA
+    #groups <- groups[!is.na(subsetTableNames),,drop=F]
+    # remove where object name is not in subsetTableNames
+    groups <- groups[groups_tabname %in% subsetTableNames,,drop=F]
     subsetTableNames <- subsetTableNames[!is.na(subsetTableNames)]
   }
 
@@ -1528,9 +1599,7 @@ ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
 
 #' @title Gets metadata for multiple variables of a table
 #'
-#' Data for each connection are returned -- contrary to the function ds.meta
-#'
-#' @description This function gets the metadata for multiple variables of a given object on the server
+#' @description This function gets the metadata for multiple variables of a given object on the server. Data for each connection are returned -- contrary to the function ds.meta.
 #' @param x a character string specifying the variables.
 #' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
 #' @param summarise_servers Logical. If FALSE, the result will be returned for
@@ -1991,7 +2060,7 @@ ds_get_type <- function(tab, vars=NULL, datasources=DSI::datashield.connections_
 #'  variable feature  value
 #'  <chr>    <chr>    <chr>
 #'  1 bmi_T1   missings 2228
-ds_get_boxplot_data <- function(tab, vars=NULL, datasources=datashield.connections_find()) {
+ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasources=datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
     return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
@@ -2016,7 +2085,7 @@ ds_get_boxplot_data <- function(tab, vars=NULL, datasources=datashield.connectio
                            # request the boxplot data
                            tryCatch({  pt <- DSI::datashield.aggregate(datasources, as.symbol(cally)) },
                                     error = function(cond) {
-                                      showNotification(paste("boxplot not permitted for ",x,"in table ",tab), duration=globals$notification_duration)
+                                      message_fun(paste("boxplot not permitted for ",x,"in table ",tab))
                                       message(conditionMessage(cond));  message(datashield.errors())
                                     }  )
                            # pool data from different servers by weighted means
@@ -2310,4 +2379,21 @@ ds.boxplot_data <-  function(x, variables = NULL, group = NULL, group2 = NULL, #
 
   # return all boxplot data (for each connection and pooled)
   pt
+}
+
+
+#' @title Launch the Shiny Dashboard
+#'
+#' @description Starts the Shiny dashboard demo.
+#' @examples
+#' \dontrun{
+#' runDemo()
+#' }
+#' @export
+runDemo <- function() {
+  appDir <- system.file("shiny-apps", "dsDashboardShiny", package = "dsDashboard")
+  if (appDir == "") {
+    stop("Could not find the app directory. Try re-installing the package.", call. = FALSE)
+  }
+  shiny::runApp(appDir, display.mode = "normal")
 }
