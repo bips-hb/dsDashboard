@@ -1,7 +1,7 @@
 If you have `devtools` installed, this package can be installed easily via:
 
 ```
-devtools::install_github("bips-hb/dsDashboaredHelper")
+devtools::install_github("bips-hb/dsDashboard")
 ```
 Alternatively you can download it and install it manually.
 
