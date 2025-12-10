@@ -83,7 +83,7 @@ library(future)
 future::plan(multisession)
 
 # register the Roboto font for use in the dashboard
-if(!ggiraph::font_family_exists("Roboto Condensed")){
+if(gdtools::match_family("Roboto Condensed")==""){
   systemfonts::register_font(name = "Roboto Condensed",
                              plain = list("www/RobotoCondensed.woff2", 0) )
 }
@@ -1838,22 +1838,22 @@ server <- function(input, output, session) {
               dplyr::pull(value)  %>%
               (function(x) x[!is.na(x)])() %>% # drops NAs for subsequent fromJSON
               lapply(jsonlite::fromJSON) %>% unlist() %>%
-              (function(x) x[!duplicated(x)])()  # keeps the attributes (unlike "unique")  ### <= this seems to be unnecessery and at least prone to errors (e.g. what if two integer categories do have the same name???)
-            #levels_tmp <- summ_stats1_tmp %>% dplyr::filter(variable == var_selected, feature == "levels") %>% dplyr::pull(value) %>%
-            #  lapply(jsonlite::fromJSON) %>% unlist() %>% names()
+              (function(x) x[!duplicated(x)])()  # keeps the attributes (unlike "unique")  ### <= this seems to be unnecessary and at least prone to errors (e.g. when two integer categories do have the same name)
+
+
             levels_tab <- summ_stats1_tmp %>% dplyr::filter(variable == var_selected, feature %in% seq_along(varLabels)) %>% dplyr::select(-one_of("variable", "tabname")) %>% tidyr::pivot_wider(names_from=feature, values_from=value)
             tmp_tab <- summ_stats1_tmp %>%
-              dplyr::filter(variable == var_selected, feature %in% as.character(seq_along(varLabels))) %>% # varLabels) %>%
+              dplyr::filter(variable == var_selected, feature %in% as.character(seq_along(varLabels))) %>%
               dplyr::select(-one_of("variable", "tabname")) %>%
               dplyr::rename(levels=feature) %>%
               dplyr::mutate(value = as.integer(value))
             tmp_tab <- tmp_tab %>%
-              dplyr::rename_with(.fn=~paste0(tab,"$",var_selected), .cols=all_of("levels")) %>%
-              dplyr::rename_with(.fn=~if (is.null(grp1)) character(0) else paste0(tab,"$",grp1), .cols=all_of(grp1)) %>%
-              dplyr::rename_with(.fn=~if (is.null(grp2)) character(0) else paste0(tab,"$",grp2), .cols=all_of(grp2))
-            # UGLY, because this will be undone a little bit below...
-            #tmp_tab[[paste0(tab,"$",var_selected)]] <- names(varLabels) [ sapply(tmp_tab[[paste0(tab,"$",var_selected)]], function(x) which(x==varLabels, arr.ind=T) ) ]
-            tmp_tab[[paste0(tab,"$",var_selected)]] <- varLabels[as.numeric(tmp_tab[[paste0(tab,"$",var_selected)]])] #varLabels
+              dplyr::rename_with(.fn=~paste0(tabsymbol,"$",var_selected), .cols=all_of("levels")) %>%
+              dplyr::rename_with(.fn=~if (is.null(grp1)) character(0) else paste0(tabsymbol,"$",grp1), .cols=all_of(grp1)) %>%
+              dplyr::rename_with(.fn=~if (is.null(grp2)) character(0) else paste0(tabsymbol,"$",grp2), .cols=all_of(grp2))
+
+
+            tmp_tab[[paste0(tabsymbol,"$",var_selected)]] <- varLabels[as.numeric(tmp_tab[[paste0(tabsymbol,"$",var_selected)]])]
             # example: Italy, Estonia,... --> country.1, country.2, ...
           } else {
             # requested summary statistics unavailable in globals$summaryDataCollection
@@ -1926,9 +1926,9 @@ server <- function(input, output, session) {
             # grouping type for the first variable must not be facets (group 1 and 2 will have to be flipped)
             req(grp1_type != "facets")
 
-            # get variable descriptions (for popover)
-            if (is.null(grp1)) grp1Metadata <- NULL else grp1Metadata <- as.matrix(var_metadata)[,"spec"][[grp1]] %>% jsonlite::fromJSON()
-            if (is.null(grp2)) grp2Metadata <- NULL else grp2Metadata <- as.matrix(var_metadata)[,"spec"][[grp2]] %>% jsonlite::fromJSON()
+            ## get variable descriptions (for popover)
+            #if (is.null(grp1)) grp1Metadata <- NULL else grp1Metadata <- as.matrix(var_metadata)[,"spec"][[grp1]] %>% jsonlite::fromJSON()
+            #if (is.null(grp2)) grp2Metadata <- NULL else grp2Metadata <- as.matrix(var_metadata)[,"spec"][[grp2]] %>% jsonlite::fromJSON()
 
             hist_obj$breaks <- hist_obj$mids
 
@@ -4654,7 +4654,7 @@ server <- function(input, output, session) {
                              quantiles="quantiles", mode="mode", `n<sub>distinct</sub>`="Ndistinct",
                              `n<sub>group_max</sub>`="max_group_n", levels="used_levels",
                              density="densplot", boxplot="boxplot", `pie chart`="sparkline_pie", `bar chart`="sparkline_bar",
-                             min="min",`10%`="10%", median="median", max="max", `n<sub>miss</sub>`="Nmissing", `n<sub>Msng</sub>`="missings", `levels<sub>all</sub>`="levels", Ntotal="Ntotal"
+                             min="min", median="median", max="max", `n<sub>miss</sub>`="Nmissing"#, `n<sub>Msng</sub>`="missings", `levels<sub>all</sub>`="levels", `n<sub>total</sub>`="Ntotal",`10%`="10%"
                            ),
                            selected = c("Nvalid"),
                            multiple = TRUE,
