@@ -84,23 +84,34 @@ dsUniqueVarnames <- function(x=NULL, datasources=DSI::datashield.connections_fin
   if (is.null(x)) return(character(0))
 
   # prepare empty dataframe with columns server and variable
-  rs <- data.frame(server=character(),
-                   variable=character())
-
+  #rs <- data.frame(server=character(),
+  #                 variable=character())
+  out <- data.frame(server = character(), variable = character(), stringsAsFactors = FALSE)
+  
   # Try to call colnamesDS on all specified datasources and return NULL in case of errors.
-  tryCatch(
-    DSI::datashield.aggregate(
-      conns=datasources,
-      expr=call("colnamesDS", x),
-      success=function(server, rs) rs <<- rbind(data.frame(server=server,
-                                                           variable=rs)),
-      error=function(server, e) print(paste0(server,": ", e)),
-    ),
-    error=function(e) NULL
-  )
-
-  # returns results per datasource (if !combined) or over all datasources (if combined)
-  if (combined) return(unique(rs$variable)) else return(rs)
+  #tryCatch(
+  #  DSI::datashield.aggregate(
+  #    conns=datasources,
+  #    expr=call("colnamesDS", x),
+  #    success=function(server, rs) rs <<- rbind(data.frame(server=server,
+  #                                                         variable=rs)),
+  #    error=function(server, e) print(paste0(server,": ", e)),
+  #  ),
+  #  error=function(e) NULL
+  #)
+  #
+  ## returns results per datasource (if !combined) or over all datasources (if combined)
+  #if (combined) return(unique(rs$variable)) else return(rs)
+  
+  res <- ds_safe_aggregate(call("colnamesDS", x), datasources, silent = TRUE)
+  if (length(res) == 0) return(character(0))
+  
+  # res[[server]] is expected to be a character vector of names
+  for (srv in names(res)) {
+    out <- rbind(out, data.frame(server = srv, variable = res[[srv]], stringsAsFactors = FALSE))
+  }
+  
+  if (combined) unique(out$variable) else out
 }
 
 #' Summary for categorical variable across all servers
@@ -795,6 +806,55 @@ ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq
   return(outputs)
 }
 
+#' Safely aggregate an expression across multiple DataSHIELD servers
+#'
+#' Performs a single \code{datashield.aggregate()} call across all provided
+#' datasources while safely handling individual server failures.
+#' Results from successful servers are returned; failures are silently ignored
+#' by default.
+#'
+#' @param expr An R expression to be evaluated on the server side.
+#' @param datasources A named list of DataSHIELD connections.
+#' @param silent Logical; if \code{TRUE} (default), server-level errors are
+#'   suppressed. If \code{FALSE}, server errors are reported via \code{message()}.
+#'
+#' @return A named list containing results from servers that successfully
+#'   evaluated the expression. Servers that failed are omitted.
+#'
+#' @details
+#' This function:
+#' \itemize{
+#'   \item Executes a single aggregate call across all datasources
+#'   \item Captures per-server success results
+#'   \item Prevents a single failing server from aborting the entire operation
+#' }
+#'
+#' @seealso \code{\link[DSI]{datashield.aggregate}}
+#'
+#' @examples
+#' \dontrun{
+#' res <- ds_safe_aggregate(
+#'   expr = quote(table(D$sex)),
+#'   datasources = conns
+#' )
+#' }
+#'
+#' @export
+ds_safe_aggregate <- function(expr, datasources, silent = TRUE) {
+  out <- list()
+  tryCatch(
+    DSI::datashield.aggregate(
+      conns = datasources,
+      expr  = expr,
+      success = function(server, res) out[[server]] <<- res,
+      error   = if (silent) function(server, e) NULL else function(server, e) { message(server, ": ", e); NULL}
+    ),
+    error = function(e) NULL
+  )
+  out
+}
+
+
 #' Get factor levels for a variable over all server connections
 #'
 #' @param var A character string. Name of the variable in the DataShield table object.
@@ -807,18 +867,31 @@ ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq
 #' dsUniqueLevels("tab1$PM_BMI_CATEGORICAL")
 #' # [1] "1" "2" "3"
 dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connections_find()) {
+  #hasTidyverse <- isTRUE(
+  #  requireNamespace("dsTidyverseClient", quietly = TRUE) &&
+  #    exists("ds.filter", where = asNamespace("dsTidyverseClient"), inherits = FALSE)
+  #)
+  
   # if table is given separately build the complete variable object string
   if (!is.null(tab)) var <- paste0(tab,"$",var)
-  # get levels using DataSHIELD (even if some but not all datasources fail)
-  #levs <- DSI::datashield.aggregate(conns=datasources, paste0("levelsDS(",var,")"))
-  levs <- lapply(datasources, function(x) tryCatch({ DSI::datashield.aggregate(conns=x, paste0("levelsDS(",var,")")) }, error = function(cond) {
-    message(conditionMessage(cond))
-    NULL
-  }))
+  
+  #if (hasTidyverse) {
+    #levs <- DSI::datashield.aggregate(conns=datasources, paste0("levelsDS(",var,")")) # would fail if object not available for connection
+    levs <- ds_safe_aggregate(as.symbol(paste0("levelsDS(", var, ")")), datasources, silent = TRUE)
+    if (length(levs) == 0) return(character(0))
+  #} else {
+  #  # get levels using DataSHIELD (even if some but not all datasources fail)
+  #  levs <- lapply(datasources, function(x) tryCatch({ DSI::datashield.aggregate(conns=x, paste0("levelsDS(",var,")")) }, error = function(cond) {
+  #    message(conditionMessage(cond))
+  #    message(datashield.errors())
+  #    NULL
+  #  }))
+  #}
+  
   # join all data.frames into one
   levs_df <- do.call(dplyr::bind_rows, levs)
   # only return unique values from all datasources
-  unique(levs_df$Levels)
+  unique(levs_df$Levels)    
 }
 
 #' Get subsets of a DataShield object for each factor level of a factor variable
@@ -833,51 +906,96 @@ dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connection
 #' # then these new tables canbe used, e.g. for a plot:
 #' ggHistDS("tab1.PM_BMI_CATEGORICAL.1$LAB_TRIG")
 dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.connections_find()) {
-  # make sure only datasources with available table tab are used
+  # keep only datasources where tab exists
   datasources <- datasources[unlist(ds.exists(tab, datasources))]
-  if (length(datasources)<1) return(NA)
-
+  if (length(datasources) < 1) return(NA)
+  
   levs <- dsUniqueLevels(var, tab, datasources)
-  df_sub <- lapply(levs, function(x) {
-    tryCatch({
-      sub_tab_name <- paste0(tab,".",var,".",x)
-
-      # if any datasource works, return the object name in sub_tab_name, otherwise return NA
-      datasources_check <- rep(TRUE, length(datasources))
-
-      if (!lazy || (sum(unlist(DSI::datashield.aggregate(datasources, call("exists", sub_tab_name)))) < 1)   ) {
-        dsBaseClient::ds.Boole(V1 = paste0(tab,"$",var),
-                 V2 = x,
-                 Boolean.operator = "==",
-                 numeric.output = TRUE,
-                 newobj = paste0(tab,".",var,".",x,".bool"),
-                 datasources = datasources)
-        for (i in 1:length(datasources)) {
-          datasources_check[i] <- FALSE
-          tryCatch({
-            dsBaseClient::ds.dataFrameSubset(df.name = tab,
-                                             V1.name = paste0(tab,".",var,".",x,".bool"),
-                                             V2.name = "1",
-                                             Boolean.operator = "==",
-                                             newobj = sub_tab_name,
-                                             datasources = datasources[i])
-            datasources_check[i] <- TRUE
-          },
-          error = function(cond) {
-            message(conditionMessage(cond))
-          })
-        }
+  if (length(levs) == 0) return(list("created subsets" = NA_character_))
+  
+  hasTidyverse <- isTRUE(
+    requireNamespace("dsTidyverseClient", quietly = TRUE) &&
+      exists("ds.filter", where = asNamespace("dsTidyverseClient"), inherits = FALSE)
+  )
+  
+  if (hasTidyverse) {
+    created <- vapply(levs, function(lvl) {
+      sub_tab_name <- paste0(tab, ".", var, ".", lvl)
+      
+      # lazy: if object exists somewhere, skip creating
+      if (lazy) {
+        ex <- tryCatch(
+          sum(unlist(DSI::datashield.aggregate(datasources, call("exists", sub_tab_name)))),
+          error = function(e) 0
+        )
+        if (ex > 0) return(sub_tab_name)
       }
-      if (!any(datasources_check)) sub_tab_name <- NA
-      sub_tab_name
-    },
-    error = function(cond) {
-      message(conditionMessage(cond))
-      NA
-    }
-    )
-  })
-  list("created subsets"=unlist(df_sub))
+      
+      # dsTidyverse filter: create the subset in one go
+      ok <- rep(FALSE, length(datasources))
+      for (i in seq_along(datasources)) {
+        ok[i] <- tryCatch({
+          dsTidyverseClient::ds.filter(
+            df.name   = tab,
+            tidy_expr = list(!!rlang::sym(var) == !!lvl),
+            newobj    = sub_tab_name,
+            datasources = datasources[i]
+          )
+          TRUE
+        }, error = function(e) {
+          message(conditionMessage(e))
+          FALSE
+        })
+      }
+      
+      if (!any(ok)) NA_character_ else sub_tab_name
+    }, FUN.VALUE = character(1))
+    
+    list("created subsets" = unname(created))    
+  } else {
+    warning("ds.filter is not available.")
+
+    df_sub <- lapply(levs, function(x) {
+      tryCatch({
+        sub_tab_name <- paste0(tab,".",var,".",x)
+  
+        # if any datasource works, return the object name in sub_tab_name, otherwise return NA
+        datasources_check <- rep(TRUE, length(datasources))
+  
+        if (!lazy || (sum(unlist(DSI::datashield.aggregate(datasources, call("exists", sub_tab_name)))) < 1)   ) {
+          dsBaseClient::ds.Boole(V1 = paste0(tab,"$",var),
+                   V2 = x,
+                   Boolean.operator = "==",
+                   numeric.output = TRUE,
+                   newobj = paste0(tab,".",var,".",x,".bool"),
+                   datasources = datasources)
+          for (i in 1:length(datasources)) {
+            datasources_check[i] <- FALSE
+            tryCatch({
+              dsBaseClient::ds.dataFrameSubset(df.name = tab,
+                                               V1.name = paste0(tab,".",var,".",x,".bool"),
+                                               V2.name = "1",
+                                               Boolean.operator = "==",
+                                               newobj = sub_tab_name,
+                                               datasources = datasources[i])
+              datasources_check[i] <- TRUE
+            },
+            error = function(cond) {
+              message(conditionMessage(cond))
+            })
+          }
+        }
+        if (!any(datasources_check)) sub_tab_name <- NA
+        sub_tab_name
+      },
+      error = function(cond) {
+        message(conditionMessage(cond))
+        NA
+      }
+      )
+    })
+    list("created subsets"=unlist(df_sub))
+  }
 }
 
 #' Get two numeric columns of a DataShield data.frame in a non-disclosive (k-nearest-neighbor) way.
@@ -1027,9 +1145,9 @@ dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=
   comb_vars <- as.data.frame(combn(vars,2))
   # dsGetxy for each combination
   comb_list <- lapply(comb_vars,
-                      #function(v) data.frame(xName=v[1], yName=v[2], dsAnalysisTools::get_xy(x = paste0(tab,"$",v[1]), y = paste0(tab,"$",v[2]), datasources = datasources)) )
+                      #function(v) data.frame(xName=v[1], yName=v[2], get_xy(x = paste0(tab,"$",v[1]), y = paste0(tab,"$",v[2]), datasources = datasources)) )
                       function(v) {
-                        xygdata <- dsAnalysisTools::dsGet_xyg(v[1],v[2],group,tab, datasources = datasources)
+                        xygdata <- dsGet_xyg(v[1],v[2],group,tab, datasources = datasources)
                         data.frame(xName=v[1], yName=v[2],  dplyr::rename(xygdata, x=v[1],y=v[2]) )
                         } )
   # rbind list elements
@@ -1077,7 +1195,7 @@ dsCallGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binom
   # get dependent variable
   dep_var <- rownames(attr(terms(formula(formula)),"factors"))[1]
   # get unique variable names for table
-  tabVariables <- dsAnalysisTools::dsUniqueVarnames(data, datasources=datasources)
+  tabVariables <- dsUniqueVarnames(data, datasources=datasources)
   # create full name for dependent variable (TABLENAME$VARIABLENAME instead of just VARIABLENAME)
   dep_var_mod <- if (dep_var %in% tabVariables) paste0(data,"$",dep_var) else dep_var
   # for family "Poisson", if dependent variable is a factor, make it numeric
@@ -1127,7 +1245,7 @@ dsResiduals <- function(mod, datasources) {
   # get model estimates
   est <- mod$coefficients[,"Estimate"]
   # get unique variable names for table (needed later)
-  tabVariables <- dsAnalysisTools::dsUniqueVarnames(mod$dataString, datasources=datasources)
+  tabVariables <- dsUniqueVarnames(mod$dataString, datasources=datasources)
   # rename labels for independent variables for further use ("1" for Intercept)
   names(est)[1] <- "1"
   # add TABLENAME$ as prefix for variables from object mod$dataString
@@ -1335,7 +1453,7 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
   }
 
   # get non-disclosive predictions, y and residuals using get_xy
-  foo <- dsAnalysisTools::get_xy(dep_var,"mod_residuals", datasources=datasources)
+  foo <- get_xy(dep_var,"mod_residuals", datasources=datasources)
   # set slots of the model analogous to the models from `stats::glm`
   mod_glm$y <- foo$x
   #mod_glm$residual <- foo$y
@@ -1375,7 +1493,7 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
 #' @return A data.frame containing the results of FUN, applied to subgroups G of table X.
 #' @examples
 #' # get summary statistics for all variables grouped by GENDER
-#' genderwise_summary <- dsGapply("tab1","GENDER",dsAnalysisTools::dsSummary, datasources=conns[1])
+#' genderwise_summary <- dsGapply("tab1","GENDER",dsSummary, datasources=conns[1])
 #' head(genderwise_summary)
 #' #   GENDER variable feature   value       tabname
 #' # 1      0  LAB_TSC       N 1092.00 tab1.GENDER.0
@@ -1693,7 +1811,7 @@ ds_get_range <- function(tab, vars=NULL, datasources=DSI::datashield.connections
   # if no variable selection is given in vars...
   if (is.null(vars)) {
     # .. then choose all numeric variables of tab
-    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)
+    vars <- dsIsNumeric(tab, datasources=datasources)
     vars <- names(vars)[vars==TRUE]
   }
 
@@ -1748,7 +1866,7 @@ ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasou
   }
 
   # if vars is NULL, get_range will automatically choose all numeric variables of tab
-  range <- dsAnalysisTools::ds_get_range(tab, vars=vars, datasources)
+  range <- ds_get_range(tab, vars=vars, datasources)
 
   # limit vars to those, for which a range has been returned
   vars <- unique(range$variable)
@@ -1763,7 +1881,7 @@ ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasou
                           # range is widened
                           safety_range <- 0.05*diff(var_range)
                           safe_range <- var_range + c(-safety_range,safety_range)
-                          dsAnalysisTools::ggHistDS(paste0(tab,"$",x), plot=F,
+                          ggHistDS(paste0(tab,"$",x), plot=F,
                                                     datasources = datasources, bins=bins,
                                                     range=safe_range
                           )
@@ -1820,7 +1938,7 @@ ds_get_variance <- function(tab, vars=NULL, datasources=DSI::datashield.connecti
   # if no variable selection is given in vars...
   if (is.null(vars)) {
     # .. then choose all numeric variables of tab
-    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
+    vars <- dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
     vars <- names(vars)[vars==TRUE]
   }
 
@@ -2069,7 +2187,7 @@ ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasourc
   # if no variable selection is given in vars...
   if (is.null(vars)) {
     # .. then choose all numeric variables of tab
-    vars <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
+    vars <- dsIsNumeric(tab, datasources=datasources)#### NEEDS tabsymbol for pooled
     vars <- names(vars)[vars==TRUE]
   }
 
@@ -2138,7 +2256,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
 
   # get names of categoricl variables in table tab (if no variable selection is given in vars / or if check==TRUE)
   if (check || is.null(vars)) {
-    vars_numeric <- dsAnalysisTools::dsIsNumeric(tab, datasources=datasources)
+    vars_numeric <- dsIsNumeric(tab, datasources=datasources)
     categorical_vars <- names(vars_numeric)[vars_numeric==FALSE]
   }
 
@@ -2248,7 +2366,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                   # get range for pseudo-numeric version of the categorical variables
                                   f_range <- setNames(c(1,length(var_levels)) + c(-0.5,0.5), c("min","max"))
                                   # create histogram according to small cells rule
-                                  histobj <- dsAnalysisTools::ggHistDS("num.obj",	bins=diff(f_range), plot=F, datasources = datasources, range=f_range, improveplot = F)
+                                  histobj <- ggHistDS("num.obj",	bins=diff(f_range), plot=F, datasources = datasources, range=f_range, improveplot = F)
                                   ##   to make it more exact we could increase the range so that the automatical correction for bins with few obs can be more often generated...
                                   rs <- histobj$combined$histobject$counts %>% setNames(var_levels)
                                   rs[rs==0] <- NA

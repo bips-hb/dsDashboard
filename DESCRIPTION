@@ -1,11 +1,12 @@
 Package: dsDashboard
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.3.0
+Title: Dashboard Framework for DataSHIELD Applications
+Version: 0.4.0
 Author: Andreas Mändle
 Maintainer: Andreas Mändle <maendle@leibniz-bips.de>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Description: Provides a framework for building interactive dashboards in R.
+    The package is designed to support data analysis both on local data and
+    on data on a DataSHIELD server.
 License: MIT
 Encoding: UTF-8
 LazyData: true

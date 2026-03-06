@@ -20,9 +20,9 @@
 # ----------------------
 # (1) some R packages unavailable in CRAN are needed:
 # devtools::install_github("haozhu233/kableExtra")  # new development version to make tables prettier
-# devtools::install_github("datashield/dsBaseClient")  # this might now be available from CRAN
-# devtools::install_github("datashield/dsBase")        # this might now be available from CRAN
-# devtools::install_github("BIPS/dsAnalysisTools")    # as soon as it is public on GitHub
+# devtools::install_github("datashield/dsBaseClient")  # this is now also available from CRAN
+# devtools::install_github("datashield/dsBase")        # this is now also available from CRAN
+# devtools::install_github("BIPS/dsDashboard")
 # ----------------------
 # (2) some R packages might have to be installed:
 # install.packages("gdtools") # if gdtools::addGFontHtmlDependency(family = c("Roboto Condensed","Roboto")) causes Error: object ‘match_fonts’ is not exported by 'namespace:systemfonts'
@@ -74,9 +74,8 @@ library(ggiraphAlluvial)
 library(DT)
 library(readxl)
 library(dplyr)
-# general functions for analysis using DataSHIELD are collected in this package
-# devtools::install_github("bips-hb/dsAnalysisTools")
-library(dsAnalysisTools)
+# general functions for dashboards using DataSHIELD are collected in this package
+library(dsDashboard)
 # for asynchronous processes:
 library(promises)
 library(future)
@@ -286,7 +285,7 @@ if (do_global_login) {
   # if there are DataSHIELD connections...
   if(!is.null(conns)) {
     # assign all tables
-    global_process_allTables <- dsAnalysisTools::assignAllTables(conns)
+    global_process_allTables <- dsDashboard::assignAllTables(conns)
     message("--all tables assigned--")
 
     # restore saved workspace (precomputed subset tables)
@@ -494,7 +493,7 @@ server <- function(input, output, session) {
 
       # extract metadata from DataSHIELD
       vars_4_meta <- sapply(selVars, function(x) paste0(tabsymbol,"$",x)) %>% unlist() # sapply, also works for empty selVars; in that case unlist turns empty list into NULL
-      var_metadata <- dsAnalysisTools::ds.meta2(vars_4_meta,
+      var_metadata <- dsDashboard::ds.meta2(vars_4_meta,
                                                 cur_conn)
       # save metadata in file
       saveRDS(var_metadata, file=metadata_path)
@@ -539,7 +538,7 @@ server <- function(input, output, session) {
         # if any DataSHIELD server is connected...
         if(!is.null(globals$conns)) {
           # assign all tables (to symbols tab1, tab2,...) and remember symbols in globals$allTables
-          isolate(globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns))
+          isolate(globals$allTables <- dsDashboard::assignAllTables(globals$conns))
           message("--all tables assigned--")
           # restore workspaces on the DataSHIELD servers
           tryCatch( {
@@ -576,9 +575,9 @@ server <- function(input, output, session) {
         lapply(1:nServer,function(i){
           builder$append(server = paste0("server",i),
                          url = input[[paste0("input",i,"")]],
-                         user = ifelse (input[[paste0("input",i,"ToP")]]==1, input[[paste0("input",i,"Usr")]], "" ),
-                         password = ifelse (input[[paste0("input",i,"ToP")]]==1, input[[paste0("input",i,"Pwd")]], "" ),
-                         token = ifelse (input[[paste0("input",i,"ToP")]]==0, input[[paste0("input",i,"Tkn")]], "" ),
+                         user = ifelse (input[[paste0("input",i,"ToP")]]==0, input[[paste0("input",i,"Usr")]], "" ),
+                         password = ifelse (input[[paste0("input",i,"ToP")]]==0, input[[paste0("input",i,"Pwd")]], "" ),
+                         token = ifelse (input[[paste0("input",i,"ToP")]]==1, input[[paste0("input",i,"Tkn")]], "" ),
                          profile = input[[paste0("input",i,"Pfl")]] )
         })
         USER$logindata <<- builder$build()
@@ -591,7 +590,7 @@ server <- function(input, output, session) {
         # if successful login...
         if(!is.null(globals$conns)) {
           # assign all tables to symbols (tab1, tab2, ...)
-          globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)
+          globals$allTables <- dsDashboard::assignAllTables(globals$conns)
           message("--all tables assigned--")
           USER$login <<- TRUE
           showNotification("Login to DataSHIELD completed.", duration=globals$notification_duration)
@@ -647,7 +646,7 @@ server <- function(input, output, session) {
 
         # do login and assign all tables
         globals$conns <- datashield.login(USER$logindata)
-        globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)
+        globals$allTables <- dsDashboard::assignAllTables(globals$conns)
 
         # assign the DSLite demo data
         doDSLiteAssignments()
@@ -811,7 +810,7 @@ server <- function(input, output, session) {
             message(msg)
             showNotification(msg, duration=globals$notification_duration, type="message")
 
-            selVars <- dsAnalysisTools::dsUniqueVarnames(tabsymbol, cur_conn)
+            selVars <- dsDashboard::dsUniqueVarnames(tabsymbol, cur_conn)
             saveRDS(selVars, file=selVarFilename)
           }
 
@@ -855,7 +854,7 @@ server <- function(input, output, session) {
             # otherwise get information from DataSHIELD and save it to cache file
             msg <- "Check which variables are numeric using DataShield. This might take several minutes. Wait or come back later..."
             showNotification(msg, duration=globals$notification_duration*5, type="message")
-            numeric_vars <- dsAnalysisTools::dsIsNumeric(tabsymbol, unname(selVars), datasources=cur_conn)
+            numeric_vars <- dsDashboard::dsIsNumeric(tabsymbol, unname(selVars), datasources=cur_conn)
             # save numeric_vars in file
             save(numeric_vars, file=isNum_filename)
           }
@@ -1104,7 +1103,7 @@ server <- function(input, output, session) {
         message("------ in promise -----")
         library(DSOpal)
         library(dsBaseClient)
-        library(dsAnalysisTools)
+        library(dsDashboard)
 
         # LOGIN to Opal-SERVER
         builder <- DSI::newDSLoginBuilder()
@@ -1121,7 +1120,7 @@ server <- function(input, output, session) {
         conn <- DSI::datashield.login(logins = logindata, restore = workspace_name)
 
         # assign all tables
-        tmpAllTables <- dsAnalysisTools::assignAllTables(conn)
+        tmpAllTables <- dsDashboard::assignAllTables(conn)
         message("in promise: tables assigned")
 
         tryCatch({
@@ -1255,8 +1254,8 @@ server <- function(input, output, session) {
       xdescriptionunique <- paste(unique(var_descriptions[xids]),collapse="\n----\n")
     } else {
       # make sure we login again if connection is lost (local and global login)
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
 
       tabsymbol <- globals$allTables[tabnr,"symbol"]
@@ -1284,7 +1283,7 @@ server <- function(input, output, session) {
         # get metadata from DataSHIELD and save it in globals
         message("get metadata from DataSHIELD for alluvial plot")
         vars_4_meta <- sapply(group_vars, function(x) paste0(tabsymbol,"$",x)) # sapply, because for empty group_vars nothing can be done...
-        var_metadata <- dsAnalysisTools::ds.meta2(vars_4_meta, cur_conn)
+        var_metadata <- dsDashboard::ds.meta2(vars_4_meta, cur_conn)
         globals$metaDataCollection[[tab]] <<- var_metadata
       } else {
         # copy metadata from globals to var_metadata
@@ -1300,7 +1299,7 @@ server <- function(input, output, session) {
       var_levs_JSON <- sapply(as.matrix(var_metadata)[,"spec",drop=F],function(x) jsonlite::fromJSON(x)$levels) %>% setNames(rownames(var_metadata)) %>% .[group_vars]
 
       # check: alluvial plots are only for categorical variables
-      all_vars <- dsAnalysisTools::dsIsNumeric(tabsymbol, group_vars, datasources=cur_conn)
+      all_vars <- dsDashboard::dsIsNumeric(tabsymbol, group_vars, datasources=cur_conn)
       if (sum(all_vars[group_vars])>0) warning("variables should be categories, but there is a numerical variable chosen... numerical variables will be dropped")
       # filter out numerical variables and save to cat_group_vars
       cat_group_vars <- group_vars[all_vars[group_vars]==FALSE]
@@ -1365,7 +1364,7 @@ server <- function(input, output, session) {
         if (!exists("f_range")) f_range <- c(1,1+sum((unlist(all_level_len)-1)*c(1,head(cumprod(all_level_len),-1))))
 
         tryCatch({
-          histobj <- dsAnalysisTools::ggHistDS("alluvial_data", plot=F, datasources = cur_conn, bins=diff(f_range)+1, range=f_range+c(-0.5,0.5))
+          histobj <- dsDashboard::ggHistDS("alluvial_data", plot=F, datasources = cur_conn, bins=diff(f_range)+1, range=f_range+c(-0.5,0.5))
           alluvial_frequencies <- setNames(histobj$combined$histobject$counts, seq(f_range[1],f_range[2]))
         },
         # fails, if the DataSHIELD options are too strict, e.g. dsBase::asFactorDS1 fails with:
@@ -1772,8 +1771,8 @@ server <- function(input, output, session) {
         # DataSHIELD mode
 
         # make sure we login to DataSHIELD if connection is lost (global and local connection)
-        if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-        tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+        if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+        tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
         # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
 
         # currently selected table
@@ -1800,7 +1799,7 @@ server <- function(input, output, session) {
             !all(c(var_selected,grp1,grp2) %in% rownames(globals$metaDataCollection[[tab]]))  # or at least metadata not for all feature and group variables
         ) {
           # get decoded spec attribute from metadata in DataSHIELD
-          cur_metadata <- dsAnalysisTools::ds.meta2(variable_objnames, cur_conn)
+          cur_metadata <- dsDashboard::ds.meta2(variable_objnames, cur_conn)
         } else {
           # get metadata for selected variables from globals
           cur_metadata <- globals$metaDataCollection[[tab]]
@@ -1953,7 +1952,7 @@ server <- function(input, output, session) {
             # catch possible dataSHIELD errors
             tryCatch(
               expr = {
-                hist_data <- dsAnalysisTools::ggHistDS(var, plot="nope", datasources = datasources, bins=bins, range=range)
+                hist_data <- dsDashboard::ggHistDS(var, plot="nope", datasources = datasources, bins=bins, range=range)
                 options(datashield.progress=T)
                 hist_obj <- hist_data$combined$histobject
                 data.frame(left=head(hist_obj$breaks,-1), right=tail(hist_obj$breaks,-1), counts=hist_obj$counts, density=hist_obj$density, mids=hist_obj$mids)
@@ -1972,7 +1971,7 @@ server <- function(input, output, session) {
           }
 
           # get range '(assumes only _one_ plot is created)
-          hist_range <- dsAnalysisTools::getRange(paste0(tabsymbol,"$",var_selected), type="combined", datasources=cur_conn)
+          hist_range <- dsDashboard::getRange(paste0(tabsymbol,"$",var_selected), type="combined", datasources=cur_conn)
           var_sd <- dsBaseClient::ds.var(paste0(tabsymbol,"$",var_selected), type = "combined", checks = F, datasources=cur_conn)
           safer_range <- T; if(safer_range) hist_range <- hist_range +  0.01*sqrt(var_sd$Global.Variance[,"EstimatedVar"])* c(-1,1)
           if (input$debugmode) browser()
@@ -2221,8 +2220,8 @@ server <- function(input, output, session) {
       # DataSHIELD mode
 
       # make sure we login to DataSHIELD if connection is lost (global and local connection)
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
 
       # get current connection
@@ -2516,7 +2515,7 @@ server <- function(input, output, session) {
       # no, then get metadata from DataSHIELD and save it in globals
       # build object names for selected variables
       vars_4_meta <- sapply(selected_vars, function(x) paste0(tabsymbol,"$",x)) # sapply, because for empty selected_vars nothing can be done...
-      var_metadata <- as.data.frame( dsAnalysisTools::ds.meta2(vars_4_meta, cur_conn) )
+      var_metadata <- as.data.frame( dsDashboard::ds.meta2(vars_4_meta, cur_conn) )
       isolate( globals$metaDataCollection[[tab]] <<- var_metadata )
     } else {
       # yes, copy metadata for the chosen variables from globals to var_metadata
@@ -2572,7 +2571,7 @@ server <- function(input, output, session) {
     if (length(datasources) < 1) return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
 
     # if no variable selected in vars, then dsIsNumeric chooses all variables of table tab
-    vars_numeric <- dsAnalysisTools::dsIsNumeric(tab, vars, datasources=datasources)
+    vars_numeric <- dsDashboard::dsIsNumeric(tab, vars, datasources=datasources)
     vars_names <- names(vars_numeric)
     vars_numeric_names <- names(vars_numeric)[vars_numeric==TRUE]
     vars_nonnumeric_names <- names(vars_numeric)[vars_numeric==FALSE]
@@ -2600,7 +2599,7 @@ server <- function(input, output, session) {
                                 " (",gsub("^.*?\\.", "", tab),")"), # shows current subgroup in parentheses
                          duration=globals$notification_duration)
         # get the summaries
-        summ1 <- dsAnalysisTools::ds_get_quantile_mean(tab, vars_with_missing_stats, datasources=datasources)
+        summ1 <- dsDashboard::ds_get_quantile_mean(tab, vars_with_missing_stats, datasources=datasources)
         # 50% qunatile is added additionally as feature "median"
         median <- summ1[summ1$feature=="50%",]
         median$feature <- "median"
@@ -2622,7 +2621,7 @@ server <- function(input, output, session) {
                          duration=globals$notification_duration)
         # summary "density sparkline" will be generated from a 20 bin histogram (includes information about range)
         hist_bins <- 20
-        summ2 <- dsAnalysisTools::ds_get_hist(tab, vars_with_missing_stats, bins=hist_bins, shiny_notification=globals$notification_duration, datasources=datasources)
+        summ2 <- dsDashboard::ds_get_hist(tab, vars_with_missing_stats, bins=hist_bins, shiny_notification=globals$notification_duration, datasources=datasources)
       }
     }
 
@@ -2637,7 +2636,7 @@ server <- function(input, output, session) {
                                 paste0(vars_with_missing_stats, collapse = ", "),
                                 " (",gsub("^.*?\\.", "", tab),")"), # shows current subgroup in parentheses
                          duration=globals$notification_duration)
-        summ3 <- dsAnalysisTools::ds_get_NA(tab, vars_with_missing_stats, datasources=datasources)
+        summ3 <- dsDashboard::ds_get_NA(tab, vars_with_missing_stats, datasources=datasources)
       }
     }
 
@@ -2672,7 +2671,7 @@ server <- function(input, output, session) {
                                 paste0(vars_with_missing_stats, collapse = ", "),
                                 " (",gsub("^.*?\\.", "", tab),")"), # shows current subgroup in parentheses
                          duration=globals$notification_duration)
-        summ5 <- dsAnalysisTools::ds_get_cat_summary(tab, vars_with_missing_stats, datasources=datasources)
+        summ5 <- dsDashboard::ds_get_cat_summary(tab, vars_with_missing_stats, datasources=datasources)
 
         # usually we want to correct the level labels here
         correct_level_labels <- TRUE
@@ -2733,7 +2732,7 @@ server <- function(input, output, session) {
                                 paste0(vars_with_missing_stats, collapse = ", "),
                                 " (",gsub("^.*?\\.", "", tab),")"), # shows current subgroup in parentheses
                          duration=globals$notification_duration)
-        summ6 <- dsAnalysisTools::ds_get_boxplot_data(tab, vars_with_missing_stats,
+        summ6 <- dsDashboard::ds_get_boxplot_data(tab, vars_with_missing_stats,
                                                       message_fun=function(x) showNotification(x, duration=globals$notification_duration),
                                                       datasources=datasources) %>%
           mutate_all(~ifelse(is.nan(.), NA, .))  # recode, because for 0 observations ymin,lower,middle,upper,ymax is NaN while the other features are NA!
@@ -2751,7 +2750,7 @@ server <- function(input, output, session) {
                                 paste0(vars_with_missing_stats, collapse = ", "),
                                 " (",gsub("^.*?\\.", "", tab),")"), # shows current subgroup in parentheses
                          duration=globals$notification_duration)
-        summ7 <- dsAnalysisTools::ds_get_type(tab, vars_with_missing_stats, datasources=datasources)
+        summ7 <- dsDashboard::ds_get_type(tab, vars_with_missing_stats, datasources=datasources)
       }
     }
 
@@ -3017,8 +3016,8 @@ server <- function(input, output, session) {
       rm(the_table)
     } else {
       # make sure we login again if login is lost
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
 
       # DataSHIELD mode
@@ -3201,9 +3200,9 @@ server <- function(input, output, session) {
         grp_summ_stats <- NULL
       else
         grp_summ_stats <- jsonlite::fromJSON(globals$summaryDataCollection[[tab]][[jsonlite::toJSON(group_vars)]])
-
+browser()
       # request summaries for mod_vars, give function all_summaries the data already available (parameter current_data)
-      isolate(summ_stats1 <- dsAnalysisTools::dsGapply(tabsymbol, group_vars, all_summaries,
+      isolate(summ_stats1 <- dsDashboard::dsGapply(tabsymbol, group_vars, all_summaries,
                                       vars=mod_vars, summaries=sum_stats_str,
                                       current_data=grp_summ_stats, datasources=cur_conn, lazy=T)  )
 
@@ -3563,8 +3562,8 @@ server <- function(input, output, session) {
 
     # in DataSHIELD mode: make sure we login again if login is lost
     if (!is.null(cur_conns)) {
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
     }
 
@@ -3582,7 +3581,7 @@ server <- function(input, output, session) {
     if (!is.null(cur_conns)){
       check_vars <- if (length(mod_vars)==0) c() else paste0(tabsymbol,"$",mod_vars)
       for (vname in check_vars) {
-        if ("factor" %in% unlist(ds.class(vname, datasources=cur_conns)) ) dsAnalysisTools::createFactorVars(vname, datasources=cur_conns)
+        if ("factor" %in% unlist(ds.class(vname, datasources=cur_conns)) ) dsDashboard::createFactorVars(vname, datasources=cur_conns)
       }
     }
 
@@ -3628,7 +3627,7 @@ server <- function(input, output, session) {
         n_levels <- length(levels(the_data[,dep_var]))
       } else {
         # DataSHIELD mode
-        n_levels <- dim(dsAnalysisTools::dsCatAgg(dep_var_obj, cur_conns))[1]
+        n_levels <- dim(dsDashboard::dsCatAgg(dep_var_obj, cur_conns))[1]
       }
 
       # if else to switch the following cases
@@ -3648,7 +3647,7 @@ server <- function(input, output, session) {
                          data = the_data)
         } else {
           tryCatch( {
-            mod_fit <- dsAnalysisTools::dsGLM(formula = mod_formula_obj,
+            mod_fit <- dsDashboard::dsGLM(formula = mod_formula_obj,
                                               family = "binomial", datasources = cur_conns, add_tab_to_depvar=F)
             globals$modFitError <<- FALSE
           },
@@ -3693,7 +3692,7 @@ server <- function(input, output, session) {
           } else {
             # DataSHIELD mode
             tryCatch( {
-              mod_fit <- dsAnalysisTools::dsGLM(formula = mod_formula_obj,
+              mod_fit <- dsDashboard::dsGLM(formula = mod_formula_obj,
                                                 family = "poisson",
                                                 datasources = cur_conns, add_tab_to_depvar=F)
               globals$modFitError <<- FALSE
@@ -3844,7 +3843,7 @@ server <- function(input, output, session) {
         } else {
           # DatasHIELD mode
           tryCatch( {
-            mod_fit <- dsAnalysisTools::dsGLM(formula = mod_formula_obj, add_tab_to_depvar = F,
+            mod_fit <- dsDashboard::dsGLM(formula = mod_formula_obj, add_tab_to_depvar = F,
                                               family = "gaussian",
                                               datasources = cur_conns)
             globals$modFitError <<- FALSE
@@ -4164,14 +4163,14 @@ server <- function(input, output, session) {
 
     } else { # DataShield mode
       # make sure we login again if login is lost
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
 
       # get boxplot data from DataSHIELD
       boxplot_data <- NULL
       tryCatch( {
-        boxplot_data <- dsAnalysisTools::ds.boxplot_data(tabsymbol, ftr_vars, group = grp1, group2=grp2,
+        boxplot_data <- dsDashboard::ds.boxplot_data(tabsymbol, ftr_vars, group = grp1, group2=grp2,
                                                          datasources = cur_conn )
       },
       error=function(e) {
@@ -4385,8 +4384,8 @@ server <- function(input, output, session) {
     if (!is.null(cur_conn)) {
       # DataSHIELD mode
       # make sure we login to DataSHIELD if connection is lost (global and local connection)
-      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(conns)})
-      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsAnalysisTools::assignAllTables(globals$conns)})
+      if (do_global_login) tryCatch( {DSI::dsListWorkspaces(conns[[1]])}, error=function(e) {conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(conns)})
+      tryCatch( {DSI::dsListWorkspaces(globals$conns[[1]])}, error=function(e) {globals$conns <<- DSI::datashield.login(logins = USER$logindata, assign = TRUE); globals$allTables <- dsDashboard::assignAllTables(globals$conns)})
       # development note: if connection is lost and tables have been pooled in the dashboard, the pooled tables have to be created again
     }
 
@@ -4781,7 +4780,7 @@ server <- function(input, output, session) {
       })
     } else {
       # DataSHIELD mode
-      df <- dsAnalysisTools::tabSummary(allTables, globals$conns)
+      df <- dsDashboard::tabSummary(allTables, globals$conns)
     }
     # updates of df_all and df_bool shall not directly request an update of this tab
     isolate({ df_curr <- df_all()})
