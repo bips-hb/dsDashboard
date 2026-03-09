@@ -87,6 +87,7 @@ if(gdtools::match_family("Roboto Condensed")==""){
                              plain = list("www/RobotoCondensed.woff2", 0) )
 }
 gdtools::register_gfont("Roboto Condensed")
+plot_font_set <- gdtools::font_set(sans = gdtools::font_google("Roboto Condensed"), serif= gdtools::font_google("Noto Serif"), mono= gdtools::font_google("Google Sans Code"),symbol= gdtools::font_google("Noto Color Emoji"))
 
 # Set process global variables:
 #-------------------------------
@@ -1552,7 +1553,7 @@ server <- function(input, output, session) {
     # put  name in plot title
     if (length(titlename)==1) pl <- pl + ggtitle(titlename)
 
-    gpl <- ggiraph::girafe(ggobj = pl, #fonts = list(sans = c("Roboto Condensed")), # specifying this, gives misaligned fonts when using the dashboard locally
+    gpl <- ggiraph::girafe(ggobj = pl, font_set = plot_font_set, #fonts = list(sans = c("Roboto Condensed")), # specifying this, gives misaligned fonts when using the dashboard locally
                            width_svg=1.2*5*(1+sqrt(5))/2, height_svg=1.2*(5))
 
     gpl <- girafe_options(gpl,
@@ -1891,7 +1892,7 @@ server <- function(input, output, session) {
                 theme_void() +
                 theme(plot.title = element_text(hjust = 0.5), base_family = "Roboto Condensed")
               gpl <- ggiraph::girafe(ggobj = p,
-                                     #fonts = list(sans = c("Roboto Condensed","Roboto")) # specifying this misaligns the font when using the dashboard locally
+                                     font_set = plot_font_set #fonts = list(sans = c("Roboto Condensed","Roboto")) # specifying this misaligns the font when using the dashboard locally
               )
               return(gpl)
             }
@@ -2090,7 +2091,7 @@ server <- function(input, output, session) {
       }
 
       # in any case we make the plot interactive
-      gpl <- ggiraph::girafe(ggobj = pl#, fonts = list(sans = c("Roboto Condensed","Roboto")) # specifying font here would misalign the font in local dashboard mode
+      gpl <- ggiraph::girafe(ggobj = pl, font_set = plot_font_set#, fonts = list(sans = c("Roboto Condensed","Roboto")) # specifying font here would misalign the font in local dashboard mode
       )
       gpl <- girafe_options(gpl,
                             opts_sizing(rescale = TRUE),
@@ -4340,7 +4341,7 @@ browser()
       box(width=12, title = "Data disclaimer", collapsible = TRUE, closable = F,
           HTML(html_disclaimer)
       ),
-      box(width=12, title = "Acknowledegment", collapsible = TRUE, closable = F,
+      box(width=12, title = "Acknowledgement", collapsible = TRUE, closable = F,
           HTML(html_acknowledgement)
       )
     )
