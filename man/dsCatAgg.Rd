@@ -9,7 +9,7 @@ dsCatAgg(x = NULL, datasources = NULL)
 \arguments{
 \item{x}{A character string specifying the name of a data.frame.}
 
-\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 A data.frame.
@@ -18,12 +18,34 @@ A data.frame.
 Summary for one (and only one!) categorical variable of a table across all servers
 }
 \examples{
-dsCatAgg("tab1$GENDER")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsCatAgg("D$GENDER")
 #   GENDER number of observations
 # 1      0                   2677
 # 2      1                   2574
 
-dsCatAgg("tab1$DIS_AMI")
+dsCatAgg("D$DIS_AMI")
 #   DIS_AMI number of observations
 # 1 invalid                     NA
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

@@ -1,1 +1,6 @@
 exportPattern("^[[:alpha:]]+")
+export("%>%")
+importFrom(magrittr,"%>%")
+importFrom(utils, head, tail, combn, globalVariables)
+importFrom(stats, contrasts, setNames, terms, var)
+importFrom(rlang, .data)

@@ -9,14 +9,32 @@ dsResiduals(mod, datasources)
 \arguments{
 \item{mod}{A list object as returned by dsCallGLM.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \description{
 This function is basically a helper function for `dsBaseClient::ds.glm`.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 mod_height_ds_lm <- dsCallGLM(formula = "PM_BMI_CONTINUOUS ~ GENDER + LAB_TRIG",
-                          data = "tab1",
+                          data = "D",
                           family = "gaussian",
                           datasources = conns)
 
@@ -26,4 +44,8 @@ dsResiduals(mod_height_ds_lm, datasources=conns)
 # test using DSLite:
 getDSLiteData(conns, "mod_residuals")
 getDSLiteData(conns, "mod_predicted")
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

@@ -13,7 +13,6 @@ ggHistDS(
   freq = T,
   safemode = F,
   range = NULL,
-  ...,
   datasources = DSI::datashield.connections_find(),
   stdnames = names(datasources),
   method = 2
@@ -42,7 +41,7 @@ data from non-failing datasources.}
 
 \item{range}{Numeric vector of length 2. A range for the histogram can be specified.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 
 \item{stdnames}{Character vector. If there are more than one datasources and
 type is not "combined", then this defines how the rows of the resulting table
@@ -60,10 +59,28 @@ A list containing the histogram object.
 Plot data in a histogram with R graphics
 }
 \examples{
-ggHistDS("tab1$LAB_TRIG")
-ggHistDS("tab1$LAB_TRIG", safemode=T, plot="separate")
-ggHistDS("tab1$LAB_TRIG", safemode=T, plot="all")
-ggHistDS("tab1$LAB_TRIG", safemode=T, plot=F)
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+ggHistDS("D$LAB_TRIG")
+ggHistDS("D$LAB_TRIG", safemode=T, plot="separate")
+ggHistDS("D$LAB_TRIG", safemode=T, plot="all")
+ggHistDS("D$LAB_TRIG", safemode=T, plot=F)
 # [[1]]
 # [[1]]$histobject
 # $breaks
@@ -100,4 +117,8 @@ ggHistDS("tab1$LAB_TRIG", safemode=T, plot=F)
 # [1] 10 11 12
 #
 # ....
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

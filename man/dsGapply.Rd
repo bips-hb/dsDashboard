@@ -9,22 +9,22 @@ dsGapply(
   G,
   FUN,
   lazy = FALSE,
-  datasources = datashield.connections_find(),
+  datasources = DSI::datashield.connections_find(),
   ...
 )
 }
 \arguments{
+\item{x}{A character string specifying a table which is available as a DataShield object.}
+
 \item{G}{A character string specifying the group variable in X according to which the data are split before applying function FUN.}
 
 \item{FUN}{A function which creates a data.frame. It will be applied to groupwise subsets of the table X.}
 
 \item{lazy}{A boolean. If TRUE then objects for groupwise tables are only created if they don't exist.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 
 \item{...}{A additional parameters to be passed to FUN.}
-
-\item{X}{A character string specifying a table which is available as a DataShield object.}
 }
 \value{
 A data.frame containing the results of FUN, applied to subgroups G of table X.
@@ -33,8 +33,26 @@ A data.frame containing the results of FUN, applied to subgroups G of table X.
 This is useful if an analysis has to be performed for each factor level of a grouping variable.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "tab1")
+
 # get summary statistics for all variables grouped by GENDER
-genderwise_summary <- dsGapply("tab1","GENDER",dsAnalysisTools::dsSummary, datasources=conns[1])
+genderwise_summary <- dsGapply("tab1","GENDER",dsSummary, datasources=conns[1])
 head(genderwise_summary)
 #   GENDER variable feature   value       tabname
 # 1      0  LAB_TSC       N 1092.00 tab1.GENDER.0
@@ -43,4 +61,8 @@ head(genderwise_summary)
 # 4      0  LAB_TSC     25\%    5.09 tab1.GENDER.0
 # 5      0  LAB_TSC     50\%    5.90 tab1.GENDER.0
 # 6      0  LAB_TSC     75\%    6.67 tab1.GENDER.0
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

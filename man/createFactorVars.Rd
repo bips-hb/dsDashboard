@@ -10,14 +10,32 @@ createFactorVars(x, datasources = DSI::datashield.connections_find())
 \arguments{
 \item{x}{A character string referring to a table column in DataShield.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 }
 \description{
 Create for each level of a (factor) variable a  boolean factor on the server
 side in DataShield.
 }
 \examples{
-createFactorVars("tab1$GENDER", datasources=conns)
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+createFactorVars("D$GENDER", datasources=conns)
 # [[1]]
 # [[1]]$is.object.created
 # [1] "A data object <GENDER0> has been created in all specified data sources"
@@ -32,4 +50,8 @@ createFactorVars("tab1$GENDER", datasources=conns)
 #
 # [[2]]$validity.check
 # [1] "<GENDER1> appears valid in all sources"
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

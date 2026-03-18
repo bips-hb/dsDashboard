@@ -29,7 +29,12 @@
 #' @param datasources A list of 'OpalConnection'.
 #' @return A data.frame
 #' @examples
-#' if (require(DSLite)) {
+#' if (require(DSLite) && require('dsBase') ) {
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'   require('dsBase')
+#' 
 #' data('CNSIM1')
 #' data('CNSIM2')
 #'
@@ -45,15 +50,21 @@
 #'
 #' # do login and table assignment
 #' conns <- DSI::datashield.login(logindata)
-#' datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
+#' DSI::datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
 #'
 #' dsTableSummary("tab1")
-#' }
 #'
 #' # output:
 #' #    server number.of.rows number.of.columns variables.held
 #' # 1 server1           2163                11   LAB_TSC,....
 #' # 2 server2           3088                11   LAB_TSC,....
+#' 
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' } else {
+#'   message("This example requires DSLite and dsBase")
+#' }
+#' @importFrom dsBaseClient ds.summary
 dsTableSummary <- function(x=NULL, datasources=NULL) {
   s_tab <- dsBaseClient::ds.summary(x = x, datasources = datasources)
   df <- as.data.frame(do.call(rbind, s_tab))
@@ -75,10 +86,32 @@ dsTableSummary <- function(x=NULL, datasources=NULL) {
 #'
 #' @return A vector.
 #' @examples
-#' dsUniqueVarnames("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsUniqueVarnames("D")
 #' # output:
-#'  [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
-#'  [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
+#' # [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
+#' # [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
+#' 
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsUniqueVarnames <- function(x=NULL, datasources=DSI::datashield.connections_find(), combined=T) {
   # if x is not given, return empty character vector
   if (is.null(x)) return(character(0))
@@ -120,22 +153,45 @@ dsUniqueVarnames <- function(x=NULL, datasources=DSI::datashield.connections_fin
 #' @param datasources A list of 'OpalConnection'.
 #' @return A data.frame.
 #' @examples
-#' dsCatVarSummary("tab1$GENDER")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsCatVarSummary("D$GENDER")
 #' #    server length level value
 #' # 1 server1   2163     0  1092
 #' # 2 server2   3088     0  1585
 #' # 3 server1   2163     1  1071
 #' # 4 server2   3088     1  1503
 #'
-#' dsCatVarSummary("tab1$DIS_AMI")
+#' dsCatVarSummary("D$DIS_AMI")
 #' #        id length   level value
 #' # 1 invalid     NA invalid    NA
+#' 
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsCatVarSummary <- function(x=NULL, datasources=NULL) {
   # get summaries using DataSHIELD for all servers in datasources
   s_tab <- dsBaseClient::ds.summary(x = x, datasources = datasources)
   # concatenate available categories for the variable as comma separated string
   s_tab <- lapply(s_tab, function(x) {
-    if(class(x)!="character")
+    if (!is.character(x))
       x$categories<-paste(x$categories, collapse=",")
     else
       return(data.frame(class=NA, length=NA,categories=NA)) # otherwise failure with invalid objects
@@ -172,17 +228,39 @@ dsCatVarSummary <- function(x=NULL, datasources=NULL) {
 #' Summary for one (and only one!) categorical variable of a table across all servers
 #'
 #' @param x A character string specifying the name of a data.frame.
-#' @param datasources A list of \code{\link{DSI::DSConnection-class}} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A data.frame.
 #' @examples
-#' dsCatAgg("tab1$GENDER")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#' 
+#' dsCatAgg("D$GENDER")
 #' #   GENDER number of observations
 #' # 1      0                   2677
 #' # 2      1                   2574
 #'
-#' dsCatAgg("tab1$DIS_AMI")
+#' dsCatAgg("D$DIS_AMI")
 #' #   DIS_AMI number of observations
 #' # 1 invalid                     NA
+#' 
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsCatAgg <- function(x=NULL, datasources=NULL) {
   # get summary for column x with dsCatVarSummary
   df <- dsCatVarSummary(x = x, datasources = datasources)
@@ -200,16 +278,38 @@ dsCatAgg <- function(x=NULL, datasources=NULL) {
 #'
 #' @param x A character string referring to a data.frame.
 #' @param x.vars Optional character string vector; a subset of the variables in table x, on which the function shall be applied
-#' @param datasources A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return A vector of boolean.
 #' @examples
-#' dsIsNumeric("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#' 
+#' dsIsNumeric("D")
 #' # LAB_TSC           LAB_TRIG            LAB_HDL  LAB_GLUC_ADJUSTED  PM_BMI_CONTINUOUS
 #' #    TRUE               TRUE               TRUE               TRUE               TRUE
 #' # DIS_CVA           MEDI_LPD           DIS_DIAB            DIS_AMI             GENDER
 #' #   FALSE              FALSE              FALSE              FALSE              FALSE
 #' # PM_BMI_CATEGORICAL
 #' #              FALSE
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsIsNumeric <- function(x=NULL, x.vars=NULL, datasources=DSI::datashield.connections_find()) {
   # use variables x.vars if available, else (if NULL) check all variables from table x
   if (!is.null(x.vars))
@@ -243,10 +343,28 @@ dsIsNumeric <- function(x=NULL, x.vars=NULL, datasources=DSI::datashield.connect
 #' numeric variables.
 #'
 #' @param x A character string referring to a DataSHIELD table.
-#' @param datasources A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections as datasource.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections as datasource.
 #' @return A data.frame.
 #' @examples
-#' dsNumVarSummary("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsNumVarSummary("D")
 #' #       LAB_TSC    LAB_TRIG   LAB_HDL LAB_GLUC_ADJUSTED PM_BMI_CONTINUOUS
 #' # 5%   4.118277 -0.47120403 0.8606589          4.095639          19.45742
 #' # 10%  4.503466  0.07673459 1.0385205          4.539658          21.20121
@@ -256,6 +374,11 @@ dsIsNumeric <- function(x=NULL, x.vars=NULL, datasources=DSI::datashield.connect
 #' # 90%  7.233349  4.04673538 2.0824057          7.642129          33.76176
 #' # 95%  7.648063  4.58631916 2.2191369          8.126197          35.57591
 #' # Mean 5.856428  2.06854312 1.5619572          6.110854          27.44250
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.quantileMean
 dsNumVarSummary <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
   # get numeric columns
   numCols <- dsIsNumeric(x, datasources=datasources)
@@ -269,10 +392,28 @@ dsNumVarSummary <- function(x=NULL, datasources=DSI::datashield.connections_find
 #' Summary for all non-numeric variables in a DataSHIELD table
 #'
 #' @param x A character string referring to a DataSHIELD table.
-#' @param datasources A list of \code{\link{DSI::DSConnection-class}} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A list of data.frame.
 #' @examples
-#' dsCatSummary("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsCatSummary("D")
 #' # $DIS_CVA
 #' # level number of observations
 #' # 1     0                   5248
@@ -302,6 +443,10 @@ dsNumVarSummary <- function(x=NULL, datasources=DSI::datashield.connections_find
 #' # 1     1                   1540
 #' # 2     2                   1989
 #' # 3     3                   1475
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsCatSummary <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
   # get names of non-numeric columns
   numCols <- dsIsNumeric(x, datasources=datasources)
@@ -319,11 +464,29 @@ dsCatSummary <- function(x=NULL, datasources=DSI::datashield.connections_find())
 #' A tidy summary for all non-numeric variables in a DataSHIELD table
 #'
 #' @param x A character string referring to a DataSHIELD table.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default
 #' is to use all findable connections.
 #' @return A data.frame.
 #' @examples
-#' dsCatTidy("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsCatTidy("D")
 #' #              variable   level number of observations
 #' # 1             DIS_CVA       0                   5248
 #' # 2             DIS_CVA       1                      3
@@ -337,6 +500,10 @@ dsCatSummary <- function(x=NULL, datasources=DSI::datashield.connections_find())
 #' # 10 PM_BMI_CATEGORICAL       1                   1540
 #' # 11 PM_BMI_CATEGORICAL       2                   1989
 #' # 12 PM_BMI_CATEGORICAL       3                   1475
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsCatTidy <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
   # get summary of categorical columns in x
   df <- dsCatSummary(x = x, datasources = datasources)
@@ -361,11 +528,29 @@ dsCatTidy <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
 #' return the number of observations.
 #'
 #' @param x A character string referring to a numeric column in a DataSHIELD table.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' Default is to use all findable datasources.
 #' @return A data.frame.
 #' @examples
-#' dsNumSummary("tab1$LAB_HDL")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsNumSummary("D$LAB_HDL")
 #' #    LAB_HDL        value
 #' #  1       N 5251.0000000
 #' #  2      5%    0.8606589
@@ -376,6 +561,11 @@ dsCatTidy <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
 #' #  7     90%    2.0824057
 #' #  8     95%    2.2191369
 #' #  9    Mean    1.5619572
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.length
 dsNumSummary <- function(x, datasources=DSI::datashield.connections_find()) {
   # extract variable name from x (TABLE$VARIABLENAME)
   varname <- unlist(regmatches(x, regexpr("\\$", x), invert = TRUE))[2]
@@ -410,10 +600,28 @@ dsNumSummary <- function(x, datasources=DSI::datashield.connections_find()) {
 #' A summary for all (numeric and non-numeric) variables in a DataSHIELD table
 #'
 #' @param x A character string referring to a numeric column in a DataSHIELD table.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A data.frame.
 #' @examples
-#' rs <- dsSummary("tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' rs <- dsSummary("D")
 #' head(rs, 20)
 #' #              variable feature   value
 #' # 1             LAB_TSC       N 5251.00
@@ -436,6 +644,10 @@ dsNumSummary <- function(x, datasources=DSI::datashield.connections_find()) {
 #' # 18           LAB_TRIG    Mean    2.07
 #' # 19            LAB_HDL       N 5251.00
 #' # 20            LAB_HDL      5%    0.86
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsSummary <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
   # check if numeric or not
   numCols <- dsIsNumeric(x, datasources=datasources)
@@ -491,15 +703,37 @@ dsSummary <- function(x=NULL, datasources=DSI::datashield.connections_find()) {
 #'
 #' The function returns the table names in case of success.
 #'
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A data.frame containing the table names.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conn1 <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' conns <- DSI::datashield.connections_find()
 #' tabNamesTidy <- assignAllTables(conns)
 #' tabNamesTidy
 #' #        id     .x
 #' # 1 server1 table1
 #' # 2 server2 table2
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 assignAllTables <- function(datasources) {
   # get all table names
   tabNames <- DSI::datashield.tables(conns = datasources)
@@ -528,15 +762,37 @@ assignAllTables <- function(datasources) {
 #'
 #' Gets row and column counts for all given tables.
 #'
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @param tabList A data.frame with the table names and server locations.
 #' @return A data.frame containing the table names, server location, symbols and dimensions.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' conns <- DSI::datashield.connections_find()
 #' tabSummary(tabNamesTidy, datasources=conns)
 #' #     id  server   name rows cols
 #' # 1 tab1 server1 table1 2163   11
 #' # 2 tab2 server2 table2 3088   11
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 tabSummary <- function(tabList, datasources) {
   # loop through lines of tabList
   df <- lapply(1:(dim(tabList)[1]), function(i) {
@@ -569,11 +825,33 @@ tabSummary <- function(tabList, datasources) {
 #'
 #' Checks if datasources are a list of DSConnection-class.
 #'
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return An integer. If datasources check passes, number of connections are returned, otherwise -1 is returned.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' checkDatasources()
 #' # 2
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 checkDatasources <- function(datasources=DSI::datashield.connections_find()) {
   # Ensure that datasources are a list of DSConnection-class
   if(!(is.list(datasources) && all(unlist(lapply(datasources, function(d) {methods::is(d,"DSConnection")}))))){
@@ -600,7 +878,7 @@ checkDatasources <- function(datasources=DSI::datashield.connections_find()) {
 #' @param noise Numeric. Only used if `method==3`. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.
 #' @param safemode Boolean, if TRUE, histogramDS1 is called for each datasource
 #' separately, to ensure that a result can be returned even if one datasource creates an error.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default
 #' is to use all findable datasources.
 #' @param stdnames Character vector. If there are more than one datasources and
 #' type is not "combined", then this defines how the rows of the resulting table
@@ -611,16 +889,38 @@ checkDatasources <- function(datasources=DSI::datashield.connections_find()) {
 #' If the value is set to 3 then the 'probabilistic' method is used.
 #' @return A numeric vector (if '"combined" or only 1 study) or a matrix (else).
 #' @examples
-#' getRange("tab1$LAB_TRIG")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' getRange("D$LAB_TRIG")
 #' #       min       max
 #' # -3.483958 12.128934
-#' getRange("tab1$LAB_TRIG", safemode=T)
+#' getRange("D$LAB_TRIG", safemode=T)
 #' #       min       max
 #' # -3.483958 12.128934
-#' getRange("tab1$LAB_TRIG", type="separate", safemode=T)
+#' getRange("D$LAB_TRIG", type="separate", safemode=T)
 #' #               min      max
 #' # server1 -3.483958 12.12893
 #' # server2 -3.331776 12.02544
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasources=DSI::datashield.connections_find(), stdnames = names(datasources), method = 1) {
   # get range; loop through studies
   # define the call for getting the range
@@ -675,7 +975,7 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
 #' otherwise the failing datasources are ignored and the results shouw only
 #' data from non-failing datasources.
 #' @param range Numeric vector of length 2. A range for the histogram can be specified.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @param stdnames Character vector. If there are more than one datasources and
 #' type is not "combined", then this defines how the rows of the resulting table
 #' are labelled. Default is to use the names of the datasources.
@@ -685,10 +985,28 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
 #' If the value is set to 3 then the 'probabilistic' method is used additionally to method 1 for bins with count zero according to method 1.
 #' @return A list containing the histogram object.
 #' @examples
-#' ggHistDS("tab1$LAB_TRIG")
-#' ggHistDS("tab1$LAB_TRIG", safemode=T, plot="separate")
-#' ggHistDS("tab1$LAB_TRIG", safemode=T, plot="all")
-#' ggHistDS("tab1$LAB_TRIG", safemode=T, plot=F)
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' ggHistDS("D$LAB_TRIG")
+#' ggHistDS("D$LAB_TRIG", safemode=T, plot="separate")
+#' ggHistDS("D$LAB_TRIG", safemode=T, plot="all")
+#' ggHistDS("D$LAB_TRIG", safemode=T, plot=F)
 #' # [[1]]
 #' # [[1]]$histobject
 #' # $breaks
@@ -725,7 +1043,11 @@ getRange <- function(x, type="combined", k=3, noise=0.25, safemode=F, datasource
 #' # [1] 10 11 12
 #' #
 #' # ....
-ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq=T, safemode=F, range=NULL, ..., datasources=DSI::datashield.connections_find(), stdnames = names(datasources), method = 2) {
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq=T, safemode=F, range=NULL, datasources=DSI::datashield.connections_find(), stdnames = names(datasources), method = 2) {
   # number of studies
   num.sources <- checkDatasources(datasources)
   if(num.sources<1) return(NULL)
@@ -833,12 +1155,31 @@ ggHistDS <- function(x, bins = "Sturges", plot="combined", k=3, noise=0.25, freq
 #'
 #' @examples
 #' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' res <- ds_safe_aggregate(
 #'   expr = quote(table(D$sex)),
 #'   datasources = conns
 #' )
-#' }
 #'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 #' @export
 ds_safe_aggregate <- function(expr, datasources, silent = TRUE) {
   out <- list()
@@ -859,13 +1200,35 @@ ds_safe_aggregate <- function(expr, datasources, silent = TRUE) {
 #'
 #' @param var A character string. Name of the variable in the DataShield table object.
 #' @param tab A character string. Name of the DataShield table object.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable datasources.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable datasources.
 #' @return A numeric vector with the names of the factor levels.
 #' @examples
-#' dsUniqueLevels("PM_BMI_CATEGORICAL","tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsUniqueLevels("PM_BMI_CATEGORICAL","D")
 #' # [1] "1" "2" "3"
-#' dsUniqueLevels("tab1$PM_BMI_CATEGORICAL")
+#' dsUniqueLevels("D$PM_BMI_CATEGORICAL")
 #' # [1] "1" "2" "3"
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connections_find()) {
   #hasTidyverse <- isTRUE(
   #  requireNamespace("dsTidyverseClient", quietly = TRUE) &&
@@ -883,7 +1246,7 @@ dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connection
   #  # get levels using DataSHIELD (even if some but not all datasources fail)
   #  levs <- lapply(datasources, function(x) tryCatch({ DSI::datashield.aggregate(conns=x, paste0("levelsDS(",var,")")) }, error = function(cond) {
   #    message(conditionMessage(cond))
-  #    message(datashield.errors())
+  #    message(DSI::datashield.errors())
   #    NULL
   #  }))
   #}
@@ -899,15 +1262,37 @@ dsUniqueLevels <- function(var, tab=NULL, datasources=DSI::datashield.connection
 #' @param tab A character string. Name of the DataShield table object.
 #' @param var A character string. Name of the variable in the DataShield table object.
 #' @param lazy A boolean. If TRUE then objects for groupwise tables are only created if they don't exist.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return A list of the names of the created DataShield objects.
 #' @examples
-#' dsSubsetLevels("PM_BMI_CATEGORICAL","tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' dsSubsetLevels("PM_BMI_CATEGORICAL","D")
 #' # then these new tables canbe used, e.g. for a plot:
-#' ggHistDS("tab1.PM_BMI_CATEGORICAL.1$LAB_TRIG")
+#' ggHistDS("D.PM_BMI_CATEGORICAL.1$LAB_TRIG")
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.connections_find()) {
   # keep only datasources where tab exists
-  datasources <- datasources[unlist(ds.exists(tab, datasources))]
+  datasources <- datasources[unlist(dsBaseClient::ds.exists(tab, datasources))]
   if (length(datasources) < 1) return(NA)
   
   levs <- dsUniqueLevels(var, tab, datasources)
@@ -1007,10 +1392,28 @@ dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.con
 #' @param method method	A character string that specifies the method that is used to generated non-disclosive coordinates to be displayed in a scatter plot. This argument can be set as 'deterministic' (method=1) or 'probabilistic' (method=2). Default 'deteministic'.
 #' @param k Numeric. Only used if 'deterministic' method is used. The number of the nearest neighbors for which their centroid is calculated. Default 3.
 #' @param noise Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return A data.frame with coloumns for x, y and server (source).
 #' @examples
-#' pair_data <- get_xy("tab1$LAB_TSC","tab1$LAB_TRIG")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' pair_data <- get_xy("D$LAB_TSC","D$LAB_TRIG")
 #'
 #' head(pair_data)
 #' #          x         y  server
@@ -1023,7 +1426,11 @@ dsSubsetLevels <- function(var, tab, lazy=FALSE, datasources=DSI::datashield.con
 #'
 #' # a simple scatterplot
 #' plot(pair_data$x, pair_data$y)
-get_xy <- function(x, y, method=1, k=3, noise=0.25, datasources=datashield.connections_find()) {
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+get_xy <- function(x, y, method=1, k=3, noise=0.25, datasources=DSI::datashield.connections_find()) {
 
   # if x is a factor, make it numeric  -- see also: dsResiduals
   x_mod <- x
@@ -1066,10 +1473,28 @@ get_xy <- function(x, y, method=1, k=3, noise=0.25, datasources=datashield.conne
 #' @param k Numeric. Only used if 'deterministic' method is used. The number of the nearest neighbors for which their centroid is calculated. Default 3.
 #' @param noise Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.
 
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return A data.frame with coloumns for x, y, group g and server (source).
 #' @examples
-#' pair_data <- dsGet_xyg("LAB_TSC","LAB_TRIG","GENDER","tab1")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' pair_data <- dsGet_xyg("LAB_TSC","LAB_TRIG","GENDER","D")
 #'
 #' head(pair_data)
 #' #    LAB_TSC  LAB_TRIG GENDER  server
@@ -1082,7 +1507,11 @@ get_xy <- function(x, y, method=1, k=3, noise=0.25, datasources=datashield.conne
 #'
 #' # a grouped scatterplot
 #' plot(pair_data$LAB_TSC, pair_data$LAB_TRIG, col=as.numeric(pair_data$GENDER)+1)
-dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=datashield.connections_find()) {
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=DSI::datashield.connections_find()) {
   # if no group is given, then just redirect to function get_xy
   if (is.null(g)) {
     xydat <- get_xy(paste0(tab,"$",x),paste0(tab,"$", y), method=method, k=k, noise=noise, datasources=datasources)
@@ -1123,10 +1552,28 @@ dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=datas
 #' @param k Numeric. Only used if 'deterministic' method is used. The number of the nearest neighbors for which their centroid is calculated. Default 3.
 #' @param noise Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.
 
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return A data.frame with coloumns for x, y, group g and server (source).
 #' @examples
-#' pair_data <- dsGetPairs("tab1",c("LAB_TSC","LAB_TRIG"),"GENDER")
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' pair_data <- dsGetPairs("D",c("LAB_TSC","LAB_TRIG"),"GENDER")
 #'
 #' head(pair_data)
 #' #      xName    yName        x         y GENDER  server
@@ -1139,7 +1586,11 @@ dsGet_xyg <- function(x, y, g, tab, method=1, k=3, noise=0.25, datasources=datas
 #'
 #' # a grouped scatterplot
 #' plot(pair_data$x, pair_data$y, col=as.numeric(pair_data$GENDER)+1)
-dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=datashield.connections_find()) {
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=DSI::datashield.connections_find()) {
 
   # all possible combinations
   comb_vars <- as.data.frame(combn(vars,2))
@@ -1172,11 +1623,29 @@ dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=
 #' @param viewIter A logical. If TRUE the results of the intermediate iterations are printed. If FALSE only final results are shown. Default FALSE.
 #' @param viewVarCov A logical. If TRUE the variance-covariance matrix of parameter estimates is returned. Default FALSE.
 #' @param viewCor A logical. If TRUE the correlation matrix of parameter estimates is returned. Default FALSE.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A list with parameters similar to glm objects.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' mod_height_ds_lm <- dsCallGLM(formula = "PM_BMI_CONTINUOUS ~ GENDER + LAB_TRIG",
-#'                           data = "tab1",
+#'                           data = "D",
 #'                           family = "gaussian",
 #'                           datasources = conns)
 #'
@@ -1185,6 +1654,11 @@ dsGetPairs <- function(tab, vars, group, method=1, k=3, noise=0.25, datasources=
 #' # (Intercept) 26.2806538  0.1574577 166.90614 0.000000e+00 25.9720424 26.5892651
 #' # GENDER1     -0.7579016  0.1521374  -4.98169 6.303141e-07 -1.0560855 -0.4597176
 #' # LAB_TRIG     0.7469029  0.0481524  15.51123 2.912536e-54  0.6525259  0.8412798
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.glm
 dsCallGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial", "poisson"), offset = NULL,
                       weights = NULL, checks = FALSE, maxit = 20, CI = 0.95, viewIter = FALSE,
                       viewVarCov = FALSE, viewCor = FALSE, datasources = NULL) {
@@ -1227,11 +1701,29 @@ dsCallGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binom
 #' This function is basically a helper function for `dsBaseClient::ds.glm`.
 #'
 #' @param mod A list object as returned by dsCallGLM.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return NULL
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' mod_height_ds_lm <- dsCallGLM(formula = "PM_BMI_CONTINUOUS ~ GENDER + LAB_TRIG",
-#'                           data = "tab1",
+#'                           data = "D",
 #'                           family = "gaussian",
 #'                           datasources = conns)
 #'
@@ -1241,6 +1733,11 @@ dsCallGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binom
 #' # test using DSLite:
 #' getDSLiteData(conns, "mod_residuals")
 #' getDSLiteData(conns, "mod_predicted")
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.make
 dsResiduals <- function(mod, datasources) {
   # get model estimates
   est <- mod$coefficients[,"Estimate"]
@@ -1313,10 +1810,28 @@ dsResiduals <- function(mod, datasources) {
 #' side in DataShield.
 #'
 #' @param x A character string referring to a table column in DataShield.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @return NULL
 #' @examples
-#' createFactorVars("tab1$GENDER", datasources=conns)
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
+#' createFactorVars("D$GENDER", datasources=conns)
 #' # [[1]]
 #' # [[1]]$is.object.created
 #' # [1] "A data object <GENDER0> has been created in all specified data sources"
@@ -1331,6 +1846,11 @@ dsResiduals <- function(mod, datasources) {
 #' #
 #' # [[2]]$validity.check
 #' # [1] "<GENDER1> appears valid in all sources"
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.asFactor
 createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) {
   # get variable name from x without table name & "$" (VARNAME instead of TABLE$VARNAME)
   varname <- tail(unlist(strsplit(x,split="\\$")),1)
@@ -1386,6 +1906,7 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
 #' Perform generalized linear model regression and return the model object
 #'
 #' including non-disclosive k-nearest neighbor estimates for residuals.
+#' @importFrom Matrix rankMatrix
 #' @param formula An object of class formula describing the model to be fitted.
 #' @param data A character string specifying the name of an (optional) data frame that contains all of the variables in the GLM formula.
 #' @param family	A character string. Identifies the error distribution function to use in the model ("gaussian", "binomial" or "poisson").
@@ -1395,12 +1916,30 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
 #' @param CI	A numeric value specifying the confidence interval (default 0.95).
 #' @param viewIter A logical. If TRUE the results of the intermediate iterations are printed. If FALSE only final results are shown. Default FALSE.
 #' @param viewCor A logical. If TRUE the correlation matrix of parameter estimates is returned. Default FALSE.
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @param add_tab_to_depvar A boolean. If TRUE, the table name + "$" is added as prefix to the dependent variable. Default is TRUE.
 #' @return A list with parameters similar to glm objects.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' foo <- dsGLM(formula = "PM_BMI_CONTINUOUS ~ GENDER + LAB_TRIG",
-#'              data = "tab1",
+#'              data = "D",
 #'              family = "gaussian",
 #'              datasources = conns)
 #' ## qq plot
@@ -1408,7 +1947,7 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
 #' qqline(foo$y)
 #'
 #' foo <- dsGLM(formula = "PM_BMI_CONTINUOUS ~ LAB_HDL + LAB_TRIG",
-#'              data = "tab1", family = "gaussian", datasources = conns)
+#'              data = "D", family = "gaussian", datasources = conns)
 #' # histogram of privacy preserving residuals
 #' hist(x = foo$residual, type = "combine", breaks = 18, datasources = conns)
 #' # compare that histogram with `dsBaseClient::ds.histogram`
@@ -1422,6 +1961,10 @@ createFactorVars <- function(x, datasources=DSI::datashield.connections_find()) 
 #' # attention: it is still not fully compatible with the models from stats::lm:
 #' # e.g. this does not work due to lack of the data slot:
 #' #stats:::plot.lm(foo)
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial", "poisson"), offset = NULL,
                   weights = NULL, maxit = 20, CI = 0.95, viewIter = FALSE,
                   viewCor = FALSE, datasources = NULL, add_tab_to_depvar = T) {  #viewVarCov = TRUE,
@@ -1447,7 +1990,7 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
   dep_var_mod <- dep_var
   if ("factor" %in% unlist(dsBaseClient::ds.class(dep_var_mod, datasources))) {
     dep_var_mod <- "glmBinomialY"
-    ds.asNumeric(x.name = dep_var,
+    dsBaseClient::ds.asNumeric(x.name = dep_var,
                  newobj = dep_var_mod,
                  datasources = datasources)
   }
@@ -1484,14 +2027,32 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
 #'
 #' This is useful if an analysis has to be performed for each factor level of a grouping variable.
 #'
-#' @param X A character string specifying a table which is available as a DataShield object.
+#' @param x A character string specifying a table which is available as a DataShield object.
 #' @param G A character string specifying the group variable in X according to which the data are split before applying function FUN.
 #' @param FUN	A function which creates a data.frame. It will be applied to groupwise subsets of the table X.
 #' @param lazy A boolean. If TRUE then objects for groupwise tables are only created if they don't exist.
-#' @param datasources  A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources  A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @param ...	A additional parameters to be passed to FUN.
 #' @return A data.frame containing the results of FUN, applied to subgroups G of table X.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "tab1")
+#'
 #' # get summary statistics for all variables grouped by GENDER
 #' genderwise_summary <- dsGapply("tab1","GENDER",dsSummary, datasources=conns[1])
 #' head(genderwise_summary)
@@ -1502,7 +2063,11 @@ dsGLM <- function(formula = NULL, data = NULL, family = c("gaussian", "binomial"
 #' # 4      0  LAB_TSC     25%    5.09 tab1.GENDER.0
 #' # 5      0  LAB_TSC     50%    5.90 tab1.GENDER.0
 #' # 6      0  LAB_TSC     75%    6.67 tab1.GENDER.0
-dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_find(), ...) {
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=DSI::datashield.connections_find(), ...) {
   # trivial case: if no group given, just apply FUN to x
   if (length(G)==0) return( FUN(x, datasources=datasources, ...) )
 
@@ -1560,7 +2125,7 @@ dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_f
 #' The variable does not need to be specified in each server to obtain a result.
 #' @details The function returns the metadata, obtained from attributes function.
 #' @param x a string character, specifying the variable
-#' @param datasources A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.
+#' @param datasources A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.
 #' @param silent Logical. If TRUE, DataSHIELD errors are suppressed.
 #' @return a matrix containing the metadata.
 #' @export
@@ -1585,9 +2150,9 @@ dsGapply <- function(x, G, FUN, lazy=FALSE, datasources=datashield.connections_f
 #'
 #'   # Get the metadata associated with table 'D'
 #'   dsBetter.metadata(x = 'D$LAB_TSC', datasources = conns)
-#'   #           server                     label opal.value_type    opal.entity_type opal.repeatable opal.index   opal.nature  class       obj.name
-#'   # LAB_TSC "study1" "Total Serum Cholesterol"       "decimal"       "Participant"               0          0  "CONTINUOUS"     NA    "D$LAB_TSC"
-#'   # LAB_TSC "study3" "Total Serum Cholesterol"       "decimal"       "Participant"               0          0  "CONTINUOUS"     NA    "D$LAB_TSC"
+#'   # server   label                     opal.value_type opal.entity_type opal.repeatable opal.index opal.nature  class obj.name   
+#'   # LAB_TSC "study1" "Total Serum Cholesterol" "decimal"       "Participant"    0               0          "CONTINUOUS" NA    "D$LAB_TSC"
+#'   # LAB_TSC "study3" "Total Serum Cholesterol" "decimal"       "Participant"    0               0          "CONTINUOUS" NA    "D$LAB_TSC"
 #'
 #'   # clear the Datashield R sessions and logout
 #'   DSI::datashield.logout(conns)
@@ -1650,9 +2215,9 @@ dsBetter.metadata <- function (x, datasources=DSI::datashield.connections_find()
 #' applied to all variables given in x.
 #' By default the result is returned as a data.frame.
 #' @param x a character string specifying the name of the table object.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @param simplify a boolean. If TRUE (default) the result is simplified to a data.frame. Otherwise a list is returned.
 #' @return \code{ds.metadata} returns to the metadata of the associated table held at the server.
 #' @export
@@ -1686,11 +2251,12 @@ dsBetter.metadata <- function (x, datasources=DSI::datashield.connections_find()
 #'   # clear the Datashield R sessions and logout
 #'   DSI::datashield.logout(conns)
 #' }
+#' @importFrom data.table rbindlist
 #'
 ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
   # get metadata using DataSHIELD
   #    [[1]]: usually the properties should be the same for all servers. we just use the first one.
-  rs <- lapply(x, function(x) ds.metadata(x, datasources)[[1]] )
+  rs <- lapply(x, function(x) dsBaseClient::ds.metadata(x, datasources)[[1]] )
 
   # optionally simplyfy rs to a data.frame
   if (simplify) {
@@ -1719,15 +2285,33 @@ ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
 #'
 #' @description This function gets the metadata for multiple variables of a given object on the server. Data for each connection are returned -- contrary to the function ds.meta.
 #' @param x a character string specifying the variables.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' @param summarise_servers Logical. If FALSE, the result will be returned for
 #' each variable  on each connection as a separate row in the resulting data.frame.
 #' Otherwise information wil be summarized over all connections.
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return \code{ds.metadata} returns to the metadata of the associated table held at the server.
 #' @export
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' # Get the metadata associated with table 'D'
 #' metadata <- ds.meta2(x = c('D$LAB_TSC','D$LAB_TRIG','D$LAB_HDL'), datasources = conns)
 #' print(metadata)
@@ -1735,6 +2319,10 @@ ds.meta <- function(x=NULL, datasources=NULL, simplify=TRUE) {
 #' # LAB_TSC  Total Serum Cholesterol         decimal      Participant               0          0  CONTINUOUS    NA  D$LAB_TSC  LAB_TSC study1,study3
 #' # LAB_TRIG           Triglycerides         decimal      Participant               0          0  CONTINUOUS    NA D$LAB_TRIG LAB_TRIG study1,study3
 #' # LAB_HDL          HDL Cholesterol         decimal      Participant               0          0  CONTINUOUS    NA  D$LAB_HDL  LAB_HDL study1,study3
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
   # return empty data.frame if no variables requested
   if (is.null(x)) return(data.frame(label=character(0),
@@ -1767,7 +2355,7 @@ ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
 
   # optionally, summarize rows over all servers
   if (summarise_servers) {
-    rs <- dplyr::group_by(rs, across(-server))
+    rs <- dplyr::group_by(rs, dplyr::across(-server))
     rs <- dplyr::summarise(rs, val= paste(server, collapse=","))
   }
 
@@ -1792,16 +2380,37 @@ ds.meta2 <- function(x=NULL, datasources=NULL, summarise_servers = T) {
 #' `datasources` the features minimum `min` and maximum `max`.
 #' @param tab A character string. Name of the DataShield table object.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the minimum and maximum for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_range("D")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'1 bmi_T1   missings 2228
+#' #   variable feature  value
+#' #   <chr>    <chr>    <chr>
+#' # 1 bmi_T1   missings 2228
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 ds_get_range <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
@@ -1844,11 +2453,29 @@ ds_get_range <- function(tab, vars=NULL, datasources=DSI::datashield.connections
 #' @param bins A numeric. The number of bins for the histogram.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
 #' @param shiny_notification A logical or integer. If not `FALSE` the parameter specifies the number of seconds that a notification is shown in case of errors.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the histogram data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_hist("D", datasources=DSI::datashield.connections_find())
 #' # A tibble: 6 × 3
 #' #   variable feature value
@@ -1859,6 +2486,10 @@ ds_get_range <- function(tab, vars=NULL, datasources=DSI::datashield.connections
 #' # 4 bmi_T1   density [0,0.0018,0.0289,0.1049,0.111,0.0683,0.0425,0.0225,0.0176,0.0138,0.0059,0.0056,0.0…
 #' # 5 bmi_T1   min     11.0884345752723
 #' # 6 bmi_T1   max     35.9674388820484
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
@@ -1888,8 +2519,8 @@ ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasou
                         }
                       }, error = function(cond) {
                         error_message <- paste("density not permitted for ",x,"in table ",tab)
-                        if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
-                        message(paste("get_hist:",conditionMessage(cond))); message(datashield.errors()); NA
+                        if (is.numeric(shiny_notification)) shiny::showNotification(error_message, duration=shiny_notification)
+                        message(paste("get_hist:",conditionMessage(cond))); message(DSI::datashield.errors()); NA
                       }) }
   )
 
@@ -1917,18 +2548,40 @@ ds_get_hist <- function(tab, vars=NULL, bins = 11, shiny_notification=F, datasou
 #' It returns for each of the requested variables (`vars`) in table `tab` from the
 #' `datasources` the variance.
 #' @param tab A character string. Name of the DataShield table object.
-#' @param bins A numeric. The number of bins for the histogram.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the histogram data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_variance("D")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'  1 bmi_T1   missings 2228
+#' #   variable feature  value
+#' #   <chr>    <chr>    <chr>
+#' # 1 bmi_T1   missings 2228
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom dsBaseClient ds.var
 ds_get_variance <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
@@ -1948,9 +2601,9 @@ ds_get_variance <- function(tab, vars=NULL, datasources=DSI::datashield.connecti
                             tryCatch({
                               variances <- dsBaseClient::ds.var(x = x, type = "combined", checks = F, datasources=datasources)
                               global_variance <- variances$Global.Variance["studiesCombined",]
-                              global_variance %>% as.list() %>% data.frame() %>% dplyr::rename(var=EstimatedVar) %>% dplyr::mutate(sd=sqrt(var))
+                              global_variance %>% as.list() %>% data.frame() %>% dplyr::rename(var=.data$EstimatedVar) %>% dplyr::mutate(sd=sqrt(.data$var))
                             }, error = function(cond) {
-                              message(paste("get_variance error for",x,"-",conditionMessage(cond))); message(datashield.errors()); NA })
+                              message(paste("get_variance error for",x,"-",conditionMessage(cond))); message(DSI::datashield.errors()); NA })
                           }
   )
 
@@ -1974,19 +2627,41 @@ ds_get_variance <- function(tab, vars=NULL, datasources=DSI::datashield.connecti
 #'
 #' It returns for the requested variable (`X`) from the
 #' `datasources` the quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and the mean.
-#' @param X A character string. The name of the DataShield object.
+#' @param x A character string. The name of the DataShield object.
 #' @param  combine Logical. If TRUE the results over all servers are combined. Otherwise results are returned for each server separately.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the histogram data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_quantileMean("D$LAB_TSC")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'  1 bmi_T1   missings 2228
-ds_quantileMean <- function(x, combine=T, datasources=datashield.connections_find() ){
+#' #   variable feature  value
+#' #   <chr>    <chr>    <chr>
+#' # 1 bmi_T1   missings 2228
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+ds_quantileMean <- function(x, combine=T, datasources=DSI::datashield.connections_find() ){
   # aggregate data with quantileMeanDS to get the quantiles
   quants <- DSI::datashield.aggregate(datasources, as.symbol(sprintf("quantileMeanDS(%s)", x)))
   # convert list to data.frame
@@ -2011,17 +2686,39 @@ ds_quantileMean <- function(x, combine=T, datasources=datashield.connections_fin
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
 #' @param  combine Logical. If TRUE the results over all servers are combined. Otherwise results are returned for each server separately.
 #' @param tidy Logical. If tidy (and combine not FALSE), then the result is formatted as a data.frame, otherwise results for each variable are returned as elements of a list.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the histogram data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_quantile_mean("D")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'  1 bmi_T1   missings 2228
-ds_get_quantile_mean <- function(tab, vars=NULL, combine=T, tidy=T, datasources=datashield.connections_find()) {
+#' #   variable feature  value
+#' #   <chr>    <chr>    <chr>
+#' # 1 bmi_T1   missings 2228
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+ds_get_quantile_mean <- function(tab, vars=NULL, combine=T, tidy=T, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
     return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
@@ -2058,26 +2755,48 @@ ds_get_quantile_mean <- function(tab, vars=NULL, combine=T, tidy=T, datasources=
 #' if the variable is a factor or character string.
 #' @param tab A character string. Name of the DataShield table object.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the number of missing values for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_NA("D", datasources=DSI::datashield.connections_find())
 #' # A tibble: 11 × 3
-#'    variable           feature  value
-#'    <chr>              <chr>    <chr>
-#'  1 LAB_TSC            missings 1005
-#'  2 LAB_TRIG           missings 1017
-#'  3 LAB_HDL            missings 1015
-#'  4 LAB_GLUC_ADJUSTED  missings 950
-#'  5 PM_BMI_CONTINUOUS  missings 302
-#'  6 DIS_CVA            missings 0
-#'  7 MEDI_LPD           missings 0
-#'  8 DIS_DIAB           missings 0
-#'  9 DIS_AMI            missings 0
-#' 10 GENDER             missings 0
-#' 11 PM_BMI_CATEGORICAL missings 302
+#' #    variable           feature  value
+#' #    <chr>              <chr>    <chr>
+#' #  1 LAB_TSC            missings 1005
+#' #  2 LAB_TRIG           missings 1017
+#' #  3 LAB_HDL            missings 1015
+#' #  4 LAB_GLUC_ADJUSTED  missings 950
+#' #  5 PM_BMI_CONTINUOUS  missings 302
+#' #  6 DIS_CVA            missings 0
+#' #  7 MEDI_LPD           missings 0
+#' #  8 DIS_DIAB           missings 0
+#' #  9 DIS_AMI            missings 0
+#' # 10 GENDER             missings 0
+#' # 11 PM_BMI_CATEGORICAL missings 302
+#' 
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 ds_get_NA <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
 
   # if length of vars is 0 then return nothing
@@ -2117,11 +2836,29 @@ ds_get_NA <- function(tab, vars=NULL, datasources=DSI::datashield.connections_fi
 #' if the variable is a factor or character string.
 #' @param tab A character string. Name of the DataShield table object.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the data type for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_type("D", datasources=DSI::datashield.connections_find())
 #' # # A tibble: 11 × 3
 #' #    variable           feature value
@@ -2137,6 +2874,11 @@ ds_get_NA <- function(tab, vars=NULL, datasources=DSI::datashield.connections_fi
 #' #  9 DIS_AMI            type    categorical
 #' # 10 GENDER             type    categorical
 #' # 11 PM_BMI_CATEGORICAL type    categorical
+#' 
+#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
 ds_get_type <- function(tab, vars=NULL, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
@@ -2168,17 +2910,40 @@ ds_get_type <- function(tab, vars=NULL, datasources=DSI::datashield.connections_
 #' `datasources` the boxplot data (for ungrouped boxplots only).
 #' @param tab A character string. Name of the DataShield table object.
 #' @param vars A vector of character strings. Names of the variables in the table object `tab`.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param message_fun, default is \code{message}. The function used to output log information in case of errors.
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the boxplot data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_boxplot_data("D")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'  1 bmi_T1   missings 2228
-ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasources=datashield.connections_find()) {
+#' #  variable feature  value
+#' #  <chr>    <chr>    <chr>
+#' #  1 bmi_T1   missings 2228#'
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+#' @importFrom data.table data.table
+ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasources=DSI::datashield.connections_find()) {
   # if length of vars is 0 then return nothing
   if (!is.null(vars) && length(vars)==0) {
     return(dplyr::as_tibble(data.frame(variable = character(), feature=character(), value=double())))
@@ -2204,7 +2969,7 @@ ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasourc
                            tryCatch({  pt <- DSI::datashield.aggregate(datasources, as.symbol(cally)) },
                                     error = function(cond) {
                                       message_fun(paste("boxplot not permitted for ",x,"in table ",tab))
-                                      message(conditionMessage(cond));  message(datashield.errors())
+                                      message(conditionMessage(cond));  message(DSI::datashield.errors())
                                     }  )
                            # pool data from different servers by weighted means
                            pt_merged <- lapply(pt, function(x) x$data) %>%
@@ -2212,7 +2977,7 @@ ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasourc
                              data.table::data.table()
                            # no groups are currently supported
                            group <- group2 <- NULL
-                           pt_merged <- panelaggregation::computeWeightedMeans(pt_merged,
+                           pt_merged <- computeWeightedMeans(pt_merged,
                                                                                variables = c("ymin", "lower", "middle", "upper", "ymax"),
                                                                                weight = "n",
                                                                                by = unlist(list("x",
@@ -2242,17 +3007,39 @@ ds_get_boxplot_data <- function(tab, vars=NULL, message_fun = message, datasourc
 #' of seconds that a notification is shown in case of errors.
 #' @param n_levels Integer value. If known in advance, the number of possible level values can be given.
 #' This can help to get reliable results in more cases.
-#' @param datasources a list of \code{\link{dsBaseClient::DSConnection-class}}
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 #' objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-#' the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.
+#' the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.
 #' @return A data.frame containing the boxplot data for each variable in table tab.
 #' @examples
+#' \dontrun{
+#'   # connecting to the Opal servers
+#'
+#'   require('DSI')
+#'   require('DSOpal')
+#'   require('dsBaseClient')
+#'
+#'   builder <- DSI::newDSLoginBuilder()
+#'   builder$append(server="study1", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM1")
+#'   builder$append(server="study3", url="https://opal-demo.obiba.org",
+#'                  user="administrator", password="password",
+#'                  table = "CNSIM.CNSIM3")
+#'   logindata <- builder$build()
+#'
+#'   conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+#'
 #' ds_get_cat_summary("D")
 #' # A tibble: 1 × 3
-#'  variable feature  value
-#'  <chr>    <chr>    <chr>
-#'  1 bmi_T1   missings 2228
-ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_levels=NULL, datasources=datashield.connections_find()) {
+#' #  variable feature  value
+#' #  <chr>    <chr>    <chr>
+#' #  1 bmi_T1   missings 2228
+#' 
+#'   # clear the Datashield R sessions and logout
+#'   DSI::datashield.logout(conns)
+#' }
+ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_levels=NULL, datasources=DSI::datashield.connections_find()) {
 
   # get names of categoricl variables in table tab (if no variable selection is given in vars / or if check==TRUE)
   if (check || is.null(vars)) {
@@ -2296,7 +3083,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                 if (n_valid_servers < length(datasources)) {
                                   error_message <- paste0("Counts for variable ",x_name , " in table ",tab," might be incorrect!")
                                   warning(error_message)
-                                  if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
+                                  if (is.numeric(shiny_notification)) shiny::showNotification(error_message, duration=shiny_notification)
                                 }
 
                                 # for level based summaries the table1DDS function can be used (attention: no output if levels have size smaller than nfilter.tab)
@@ -2330,11 +3117,11 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                       max(dplyr::select(., !!1:length(var_levels) ), na.rm=T)
                                       else
                                         max(dplyr::select(., !!1:length(var_levels) ), na.rm=F)}, # max_group_n considering NAs due to privacy
-                                    mode = {if (is.na(max_group_n) | max_group_n==0)
+                                    mode = {if (is.na(.data$max_group_n) | max_group_n==0)
                                       NA
                                       else
-                                        jsonlite::toJSON(names(dplyr::select(., !!1:length(var_levels) ))[which(.==max_group_n)]  ) } ) %>%
-                                  dplyr::select(-Total) %>% #dplyr::rename(Nvalid=Total) %>% # ok for levels 1,2,3,... (would be problematic if there was a factor level named "Total")
+                                        jsonlite::toJSON(names(dplyr::select(., !!1:length(var_levels) ))[which(.==.data$max_group_n)]  ) } ) %>%
+                                  dplyr::select(-.data$Total) %>% #dplyr::rename(Nvalid=Total) %>% # ok for levels 1,2,3,... (would be problematic if there was a factor level named "Total")
                                   dplyr::mutate(Ndistinct=Ndistinct,
                                                 Ntotal=Ntotal,
                                                 Nmissing=N_missing,
@@ -2345,7 +3132,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                 # fallback: for level based summaries use histogram function
                                 tryCatch({
                                   # make categorical variable numeric, so we can use the histogram functions
-                                  ds.asNumeric(x, "num.obj", datasources)
+                                  dsBaseClient::ds.asNumeric(x, "num.obj", datasources)
 
                                   # extract levels 1,2,...
                                   if (!is.null(n_levels)) {
@@ -2358,7 +3145,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                     if (diff(max_limits) > 1) {
                                       warn_message <- paste("guessed number of levels for",x_name,"is not reliable")
                                       warning(warn_message)
-                                      if (is.numeric(shiny_notification)) showNotification(warn_message, duration=shiny_notification)
+                                      if (is.numeric(shiny_notification)) shiny::showNotification(warn_message, duration=shiny_notification)
                                     }
                                     var_levels <- 1:mean(max_limits)
                                   }
@@ -2366,12 +3153,12 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                   # get range for pseudo-numeric version of the categorical variables
                                   f_range <- setNames(c(1,length(var_levels)) + c(-0.5,0.5), c("min","max"))
                                   # create histogram according to small cells rule
-                                  histobj <- ggHistDS("num.obj",	bins=diff(f_range), plot=F, datasources = datasources, range=f_range, improveplot = F)
+                                  histobj <- ggHistDS("num.obj",	bins=diff(f_range), plot=F, datasources = datasources, range=f_range)
                                   ##   to make it more exact we could increase the range so that the automatical correction for bins with few obs can be more often generated...
                                   rs <- histobj$combined$histobject$counts %>% setNames(var_levels)
                                   rs[rs==0] <- NA
                                   used_levels <- rs[!is.na(rs)] %>% names()
-                                  Ndistinct <- paste0("≥",length(used_levels))
+                                  Ndistinct <- paste0("\u2265",length(used_levels))
                                   used_levels <- c(used_levels,"...")
                                   levels_json <- jsonlite::toJSON(as.character(var_levels))
                                   used_levels_json <- jsonlite::toJSON(used_levels)
@@ -2398,9 +3185,9 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
                                   # show warnings/errors
                                   warning(paste("summary for categorical variable",x,"failed"))
                                   warning(conditionMessage(cond))
-                                  warning(datashield.errors())
+                                  warning(DSI::datashield.errors())
                                   error_message <- paste("Restricted output for variable",x,"due to privacy parameters")
-                                  if (is.numeric(shiny_notification)) showNotification(error_message, duration=shiny_notification)
+                                  if (is.numeric(shiny_notification)) shiny::showNotification(error_message, duration=shiny_notification)
 
                                   # build empty result
                                   in_lapply_result <<- data.frame(
@@ -2420,14 +3207,41 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
   do.call(rbind, all_cat_summary)
 }
 
+#'
+#' @title Checks that an object has the same class in all studies
+#' @description This is originally an internal function in the dsBaseClient package \code{\link[dsBaseClient]{checkClass}} and has been imported here.
+#' @details In DataSHIELD an object included in analysis must be of the same type in all
+#' the collaborating studies. If that is not the case the process is stopped
+#' @param datasources a list of \link[DSI:DSConnection-class]{DSConnection-class} objects obtained after login. If the <datasources>
+#' the default set of connections will be used: see \link[DSI]{datashield.connections_default}.
+#' @param obj a string character, the name of the object to check for.
+#' @keywords internal
+#' @return a message or the class of the object if the object has the same class in all studies.
+#'
+#'
+checkClass <- function(datasources=NULL, obj=NULL){
+  # check the class of the input object
+  cally <- call("classDS", obj)
+  classesBy <- DSI::datashield.aggregate(datasources, cally, async = FALSE)
+  classes <- unique(unlist(classesBy))
+  for (n in names(classesBy)) {
+    if (!all(classes == classesBy[[n]])) {
+      message("The input data is not of the same class in all studies!")
+      message("Use the function 'ds.class' to verify the class of the input object in each study.")
+      stop(" End of process!", call.=FALSE)
+    }
+  }
+  return(classes)
+}
+
 #' @title Return boxplot data
 #'
 #' @description Returns the first quantile, median, third quantile and a data privacy preserving safe range (ymin and ymax).
-#' @param tab A character string. Name of the DataShield table object.
+#' @param x A character string. Name of the DataShield table object.
 #' @param variables A character vector. Name of the requested columns of the DataShield table object.
 #' @param group A character string or NULL. If ! NUL, then the boxplot data are for grouped boxplots for each group level of the variable "group".
 #' @param group2 A character string or NULL. If ! NUL, then the boxplot data are for grouped boxplots for each group level of the variable "group2".
-#' @param datasources  A list of \link[DSI]{DSConnection-class} objects.
+#' @param datasources  A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 #' @return A data.frame containing the data type for each variable in table tab.
 #' @examples
 #' \dontrun{
@@ -2464,7 +3278,7 @@ ds_get_cat_summary <- function(tab, vars=NULL, check=T, shiny_notification=F, n_
 #'
 ds.boxplot_data <-  function(x, variables = NULL, group = NULL, group2 = NULL, #xlabel = "x axis", ylabel = "y axis",
                              datasources = DSI::datashield.connections_find()){
-  cls <- dsBaseClient:::checkClass(datasources, x)
+  cls <- checkClass(datasources, x)
   if(!any(c("data.frame") %in% cls)) stop("x was expected to refer to a data.frame on the DataShield server")
 
   # prepare boxplot raw data on the servers
@@ -2489,7 +3303,7 @@ ds.boxplot_data <-  function(x, variables = NULL, group = NULL, group2 = NULL, #
     pt$combined <- rbind(pt$combined, pt[[i]]$data)
   }
   pt$combined <- data.table::data.table(pt$combined)
-  pt$combined <- panelaggregation::computeWeightedMeans(pt$combined,
+  pt$combined <- computeWeightedMeans(pt$combined,
                                                         variables = c("ymin", "lower", "middle", "upper", "ymax"),
                                                         weight = "n",
                                                         by = c(if (!is.null(group)) "group" else NULL, if (!is.null(group2)) "group2" else NULL, "x")

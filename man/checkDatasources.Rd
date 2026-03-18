@@ -7,7 +7,7 @@
 checkDatasources(datasources = DSI::datashield.connections_find())
 }
 \arguments{
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 An integer. If datasources check passes, number of connections are returned, otherwise -1 is returned.
@@ -16,6 +16,28 @@ An integer. If datasources check passes, number of connections are returned, oth
 Checks if datasources are a list of DSConnection-class.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 checkDatasources()
 # 2
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

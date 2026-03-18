@@ -28,7 +28,7 @@ otherwise a list of all server results is returned.}
 \item{safemode}{Boolean, if TRUE, histogramDS1 is called for each datasource
 separately, to ensure that a result can be returned even if one datasource creates an error.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default
 is to use all findable datasources.}
 
 \item{stdnames}{Character vector. If there are more than one datasources and
@@ -53,14 +53,36 @@ If safemode is FALSE the function will fail if histogramDS1 fails for any
 server.
 }
 \examples{
-getRange("tab1$LAB_TRIG")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+getRange("D$LAB_TRIG")
 #       min       max
 # -3.483958 12.128934
-getRange("tab1$LAB_TRIG", safemode=T)
+getRange("D$LAB_TRIG", safemode=T)
 #       min       max
 # -3.483958 12.128934
-getRange("tab1$LAB_TRIG", type="separate", safemode=T)
+getRange("D$LAB_TRIG", type="separate", safemode=T)
 #               min      max
 # server1 -3.483958 12.12893
 # server2 -3.331776 12.02544
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

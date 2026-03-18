@@ -18,14 +18,37 @@ A data.frame.
 Summary for categorical variable across all servers
 }
 \examples{
-dsCatVarSummary("tab1$GENDER")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsCatVarSummary("D$GENDER")
 #    server length level value
 # 1 server1   2163     0  1092
 # 2 server2   3088     0  1585
 # 3 server1   2163     1  1071
 # 4 server2   3088     1  1503
 
-dsCatVarSummary("tab1$DIS_AMI")
+dsCatVarSummary("D$DIS_AMI")
 #        id length   level value
 # 1 invalid     NA invalid    NA
+
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

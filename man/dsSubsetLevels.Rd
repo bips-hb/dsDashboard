@@ -18,7 +18,7 @@ dsSubsetLevels(
 
 \item{lazy}{A boolean. If TRUE then objects for groupwise tables are only created if they don't exist.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 }
 \value{
 A list of the names of the created DataShield objects.
@@ -27,7 +27,29 @@ A list of the names of the created DataShield objects.
 Get subsets of a DataShield object for each factor level of a factor variable
 }
 \examples{
-dsSubsetLevels("PM_BMI_CATEGORICAL","tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsSubsetLevels("PM_BMI_CATEGORICAL","D")
 # then these new tables canbe used, e.g. for a plot:
-ggHistDS("tab1.PM_BMI_CATEGORICAL.1$LAB_TRIG")
+ggHistDS("D.PM_BMI_CATEGORICAL.1$LAB_TRIG")
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

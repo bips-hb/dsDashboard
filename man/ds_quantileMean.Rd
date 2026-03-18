@@ -4,16 +4,20 @@
 \alias{ds_quantileMean}
 \title{Get quantiles and mean (separate or combined for all servers) for one numeric variable}
 \usage{
-ds_quantileMean(x, combine = T, datasources = datashield.connections_find())
+ds_quantileMean(
+  x,
+  combine = T,
+  datasources = DSI::datashield.connections_find()
+)
 }
 \arguments{
+\item{x}{A character string. The name of the DataShield object.}
+
 \item{combine}{Logical. If TRUE the results over all servers are combined. Otherwise results are returned for each server separately.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
-
-\item{X}{A character string. The name of the DataShield object.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 A data.frame containing the histogram data for each variable in table tab.
@@ -26,9 +30,31 @@ It returns for the requested variable (`X`) from the
 `datasources` the quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and the mean.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 ds_quantileMean("D$LAB_TSC")
 # A tibble: 1 × 3
- variable feature  value
- <chr>    <chr>    <chr>
- 1 bmi_T1   missings 2228
+#   variable feature  value
+#   <chr>    <chr>    <chr>
+# 1 bmi_T1   missings 2228
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

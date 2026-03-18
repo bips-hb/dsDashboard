@@ -10,7 +10,7 @@ get_xy(
   method = 1,
   k = 3,
   noise = 0.25,
-  datasources = datashield.connections_find()
+  datasources = DSI::datashield.connections_find()
 )
 }
 \arguments{
@@ -24,7 +24,7 @@ get_xy(
 
 \item{noise}{Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 }
 \value{
 A data.frame with coloumns for x, y and server (source).
@@ -33,7 +33,25 @@ A data.frame with coloumns for x, y and server (source).
 These data can than be used e.g. for a scatterplot or an analysis on the client side.
 }
 \examples{
-pair_data <- get_xy("tab1$LAB_TSC","tab1$LAB_TRIG")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+pair_data <- get_xy("D$LAB_TSC","D$LAB_TRIG")
 
 head(pair_data)
 #          x         y  server
@@ -46,4 +64,8 @@ head(pair_data)
 
 # a simple scatterplot
 plot(pair_data$x, pair_data$y)
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

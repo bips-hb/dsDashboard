@@ -9,7 +9,7 @@ tabSummary(tabList, datasources)
 \arguments{
 \item{tabList}{A data.frame with the table names and server locations.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 A data.frame containing the table names, server location, symbols and dimensions.
@@ -18,9 +18,31 @@ A data.frame containing the table names, server location, symbols and dimensions
 Gets row and column counts for all given tables.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 conns <- DSI::datashield.connections_find()
 tabSummary(tabNamesTidy, datasources=conns)
 #     id  server   name rows cols
 # 1 tab1 server1 table1 2163   11
 # 2 tab2 server2 table2 3088   11
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

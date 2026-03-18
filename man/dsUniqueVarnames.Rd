@@ -24,8 +24,30 @@ A vector.
 Get unique variable names of a table object across all servers
 }
 \examples{
-dsUniqueVarnames("tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsUniqueVarnames("D")
 # output:
- [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
- [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
+# [1] "LAB_TSC"            "LAB_TRIG"           "LAB_HDL"            "LAB_GLUC_ADJUSTED"  "PM_BMI_CONTINUOUS"  "DIS_CVA"            "MEDI_LPD"
+# [8] "DIS_DIAB"           "DIS_AMI"            "GENDER"             "PM_BMI_CATEGORICAL"
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

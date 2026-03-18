@@ -7,7 +7,7 @@
 assignAllTables(datasources)
 }
 \arguments{
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 A data.frame containing the table names.
@@ -16,10 +16,32 @@ A data.frame containing the table names.
 The function returns the table names in case of success.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conn1 <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 conns <- DSI::datashield.connections_find()
 tabNamesTidy <- assignAllTables(conns)
 tabNamesTidy
 #        id     .x
 # 1 server1 table1
 # 2 server2 table2
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

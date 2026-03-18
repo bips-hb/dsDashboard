@@ -9,7 +9,7 @@ dsCatSummary(x = NULL, datasources = DSI::datashield.connections_find())
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 A list of data.frame.
@@ -18,7 +18,25 @@ A list of data.frame.
 Summary for all non-numeric variables in a DataSHIELD table
 }
 \examples{
-dsCatSummary("tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsCatSummary("D")
 # $DIS_CVA
 # level number of observations
 # 1     0                   5248
@@ -48,4 +66,8 @@ dsCatSummary("tab1")
 # 1     1                   1540
 # 2     2                   1989
 # 3     3                   1475
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

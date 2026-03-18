@@ -11,7 +11,7 @@ dsGetPairs(
   method = 1,
   k = 3,
   noise = 0.25,
-  datasources = datashield.connections_find()
+  datasources = DSI::datashield.connections_find()
 )
 }
 \arguments{
@@ -27,7 +27,7 @@ dsGetPairs(
 
 \item{noise}{Numeric. Only used if 'probabilistic' method is used. The percentage of the initial variance that is used as the variance of the embedded noise if the argument method is set to 'probabilistic'.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 }
 \value{
 A data.frame with coloumns for x, y, group g and server (source).
@@ -36,7 +36,25 @@ A data.frame with coloumns for x, y, group g and server (source).
 This function is basically a wrapper for dsGet_xyg, with slightly different syntax and output.
 }
 \examples{
-pair_data <- dsGetPairs("tab1",c("LAB_TSC","LAB_TRIG"),"GENDER")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+pair_data <- dsGetPairs("D",c("LAB_TSC","LAB_TRIG"),"GENDER")
 
 head(pair_data)
 #      xName    yName        x         y GENDER  server
@@ -49,4 +67,8 @@ head(pair_data)
 
 # a grouped scatterplot
 plot(pair_data$x, pair_data$y, col=as.numeric(pair_data$GENDER)+1)
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

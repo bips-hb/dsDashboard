@@ -13,15 +13,15 @@ ds.boxplot_data(
 )
 }
 \arguments{
+\item{x}{A character string. Name of the DataShield table object.}
+
 \item{variables}{A character vector. Name of the requested columns of the DataShield table object.}
 
 \item{group}{A character string or NULL. If ! NUL, then the boxplot data are for grouped boxplots for each group level of the variable "group".}
 
 \item{group2}{A character string or NULL. If ! NUL, then the boxplot data are for grouped boxplots for each group level of the variable "group2".}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.}
-
-\item{tab}{A character string. Name of the DataShield table object.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.}
 }
 \value{
 A data.frame containing the data type for each variable in table tab.

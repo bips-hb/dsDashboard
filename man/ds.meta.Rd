@@ -9,9 +9,9 @@ ds.meta(x = NULL, datasources = NULL, simplify = TRUE)
 \arguments{
 \item{x}{a character string specifying the name of the table object.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 
 \item{simplify}{a boolean. If TRUE (default) the result is simplified to a data.frame. Otherwise a list is returned.}
 }
@@ -54,5 +54,4 @@ By default the result is returned as a data.frame.
   # clear the Datashield R sessions and logout
   DSI::datashield.logout(conns)
 }
-
 }

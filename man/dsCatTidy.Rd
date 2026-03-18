@@ -9,7 +9,7 @@ dsCatTidy(x = NULL, datasources = DSI::datashield.connections_find())
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default
 is to use all findable connections.}
 }
 \value{
@@ -19,7 +19,25 @@ A data.frame.
 A tidy summary for all non-numeric variables in a DataSHIELD table
 }
 \examples{
-dsCatTidy("tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsCatTidy("D")
 #              variable   level number of observations
 # 1             DIS_CVA       0                   5248
 # 2             DIS_CVA       1                      3
@@ -33,4 +51,8 @@ dsCatTidy("tab1")
 # 10 PM_BMI_CATEGORICAL       1                   1540
 # 11 PM_BMI_CATEGORICAL       2                   1989
 # 12 PM_BMI_CATEGORICAL       3                   1475
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

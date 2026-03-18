@@ -15,9 +15,9 @@ ds_get_range(
 
 \item{vars}{A vector of character strings. Names of the variables in the table object `tab`.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 A data.frame containing the minimum and maximum for each variable in table tab.
@@ -30,9 +30,30 @@ It returns for each of the requested variables (`vars`) in table `tab` from the
 `datasources` the features minimum `min` and maximum `max`.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 ds_get_range("D")
 # A tibble: 1 × 3
- variable feature  value
- <chr>    <chr>    <chr>
-1 bmi_T1   missings 2228
+#   variable feature  value
+#   <chr>    <chr>    <chr>
+# 1 bmi_T1   missings 2228
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

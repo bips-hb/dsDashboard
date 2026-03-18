@@ -15,7 +15,7 @@ dsUniqueLevels(
 
 \item{tab}{A character string. Name of the DataShield table object.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable datasources.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable datasources.}
 }
 \value{
 A numeric vector with the names of the factor levels.
@@ -24,8 +24,30 @@ A numeric vector with the names of the factor levels.
 Get factor levels for a variable over all server connections
 }
 \examples{
-dsUniqueLevels("PM_BMI_CATEGORICAL","tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsUniqueLevels("PM_BMI_CATEGORICAL","D")
 # [1] "1" "2" "3"
-dsUniqueLevels("tab1$PM_BMI_CATEGORICAL")
+dsUniqueLevels("D$PM_BMI_CATEGORICAL")
 # [1] "1" "2" "3"
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

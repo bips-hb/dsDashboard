@@ -13,7 +13,7 @@ dsBetter.metadata(
 \arguments{
 \item{x}{a string character, specifying the variable}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 
 \item{silent}{Logical. If TRUE, DataSHIELD errors are suppressed.}
 }
@@ -53,9 +53,9 @@ The function returns the metadata, obtained from attributes function.
 
   # Get the metadata associated with table 'D'
   dsBetter.metadata(x = 'D$LAB_TSC', datasources = conns)
-  #           server                     label opal.value_type    opal.entity_type opal.repeatable opal.index   opal.nature  class       obj.name
-  # LAB_TSC "study1" "Total Serum Cholesterol"       "decimal"       "Participant"               0          0  "CONTINUOUS"     NA    "D$LAB_TSC"
-  # LAB_TSC "study3" "Total Serum Cholesterol"       "decimal"       "Participant"               0          0  "CONTINUOUS"     NA    "D$LAB_TSC"
+  # server   label                     opal.value_type opal.entity_type opal.repeatable opal.index opal.nature  class obj.name   
+  # LAB_TSC "study1" "Total Serum Cholesterol" "decimal"       "Participant"    0               0          "CONTINUOUS" NA    "D$LAB_TSC"
+  # LAB_TSC "study3" "Total Serum Cholesterol" "decimal"       "Participant"    0               0          "CONTINUOUS" NA    "D$LAB_TSC"
 
   # clear the Datashield R sessions and logout
   DSI::datashield.logout(conns)

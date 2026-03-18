@@ -21,9 +21,9 @@ ds_get_hist(
 
 \item{shiny_notification}{A logical or integer. If not `FALSE` the parameter specifies the number of seconds that a notification is shown in case of errors.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 A data.frame containing the histogram data for each variable in table tab.
@@ -36,6 +36,24 @@ It returns for each of the requested variables (`vars`) in table `tab` from the
 `datasources` the features histograms information including bin positions and sizes.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 ds_get_hist("D", datasources=DSI::datashield.connections_find())
 # A tibble: 6 × 3
 #   variable feature value
@@ -46,4 +64,8 @@ ds_get_hist("D", datasources=DSI::datashield.connections_find())
 # 4 bmi_T1   density [0,0.0018,0.0289,0.1049,0.111,0.0683,0.0425,0.0225,0.0176,0.0138,0.0059,0.0056,0.0…
 # 5 bmi_T1   min     11.0884345752723
 # 6 bmi_T1   max     35.9674388820484
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

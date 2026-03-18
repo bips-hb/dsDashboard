@@ -37,7 +37,7 @@ dsGLM(
 
 \item{viewCor}{A logical. If TRUE the correlation matrix of parameter estimates is returned. Default FALSE.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 
 \item{add_tab_to_depvar}{A boolean. If TRUE, the table name + "$" is added as prefix to the dependent variable. Default is TRUE.}
 }
@@ -48,8 +48,26 @@ A list with parameters similar to glm objects.
 including non-disclosive k-nearest neighbor estimates for residuals.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 foo <- dsGLM(formula = "PM_BMI_CONTINUOUS ~ GENDER + LAB_TRIG",
-             data = "tab1",
+             data = "D",
              family = "gaussian",
              datasources = conns)
 ## qq plot
@@ -57,7 +75,7 @@ qqnorm(foo$y)
 qqline(foo$y)
 
 foo <- dsGLM(formula = "PM_BMI_CONTINUOUS ~ LAB_HDL + LAB_TRIG",
-             data = "tab1", family = "gaussian", datasources = conns)
+             data = "D", family = "gaussian", datasources = conns)
 # histogram of privacy preserving residuals
 hist(x = foo$residual, type = "combine", breaks = 18, datasources = conns)
 # compare that histogram with `dsBaseClient::ds.histogram`
@@ -71,4 +89,8 @@ dsBaseClient::ds.scatterPlot(x="mod_predicted", y="mod_residuals", type="combine
 # attention: it is still not fully compatible with the models from stats::lm:
 # e.g. this does not work due to lack of the data slot:
 #stats:::plot.lm(foo)
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

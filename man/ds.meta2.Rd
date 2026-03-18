@@ -9,13 +9,13 @@ ds.meta2(x = NULL, datasources = NULL, summarise_servers = T)
 \arguments{
 \item{x}{a character string specifying the variables.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}}
 
 \item{summarise_servers}{Logical. If FALSE, the result will be returned for
 each variable  on each connection as a separate row in the resulting data.frame.
 Otherwise information wil be summarized over all connections.
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 \code{ds.metadata} returns to the metadata of the associated table held at the server.
@@ -24,6 +24,24 @@ the default set of connections will be used: see \code{\link{dsBaseClient::datas
 This function gets the metadata for multiple variables of a given object on the server. Data for each connection are returned -- contrary to the function ds.meta.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 # Get the metadata associated with table 'D'
 metadata <- ds.meta2(x = c('D$LAB_TSC','D$LAB_TRIG','D$LAB_HDL'), datasources = conns)
 print(metadata)
@@ -31,4 +49,8 @@ print(metadata)
 # LAB_TSC  Total Serum Cholesterol         decimal      Participant               0          0  CONTINUOUS    NA  D$LAB_TSC  LAB_TSC study1,study3
 # LAB_TRIG           Triglycerides         decimal      Participant               0          0  CONTINUOUS    NA D$LAB_TRIG LAB_TRIG study1,study3
 # LAB_HDL          HDL Cholesterol         decimal      Participant               0          0  CONTINUOUS    NA  D$LAB_HDL  LAB_HDL study1,study3
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

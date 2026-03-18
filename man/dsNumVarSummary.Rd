@@ -9,7 +9,7 @@ dsNumVarSummary(x = NULL, datasources = DSI::datashield.connections_find())
 \arguments{
 \item{x}{A character string referring to a DataSHIELD table.}
 
-\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections as datasource.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections as datasource.}
 }
 \value{
 A data.frame.
@@ -19,7 +19,25 @@ Quantiles (5%, 10%, 25%, 50%, 75%, 90%, 95%) and mean are computed for all
 numeric variables.
 }
 \examples{
-dsNumVarSummary("tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsNumVarSummary("D")
 #       LAB_TSC    LAB_TRIG   LAB_HDL LAB_GLUC_ADJUSTED PM_BMI_CONTINUOUS
 # 5\%   4.118277 -0.47120403 0.8606589          4.095639          19.45742
 # 10\%  4.503466  0.07673459 1.0385205          4.539658          21.20121
@@ -29,4 +47,8 @@ dsNumVarSummary("tab1")
 # 90\%  7.233349  4.04673538 2.0824057          7.642129          33.76176
 # 95\%  7.648063  4.58631916 2.2191369          8.126197          35.57591
 # Mean 5.856428  2.06854312 1.5619572          6.110854          27.44250
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

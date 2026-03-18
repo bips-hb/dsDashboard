@@ -11,9 +11,9 @@ ds_get_type(tab, vars = NULL, datasources = DSI::datashield.connections_find())
 
 \item{vars}{A vector of character strings. Names of the variables in the table object `tab`.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 A data.frame containing the data type for each variable in table tab.
@@ -26,6 +26,24 @@ It eturns for each of the requested variables (`vars`) in table `tab` from the
 if the variable is a factor or character string.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 ds_get_type("D", datasources=DSI::datashield.connections_find())
 # # A tibble: 11 × 3
 #    variable           feature value
@@ -41,4 +59,9 @@ ds_get_type("D", datasources=DSI::datashield.connections_find())
 #  9 DIS_AMI            type    categorical
 # 10 GENDER             type    categorical
 # 11 PM_BMI_CATEGORICAL type    categorical
+
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

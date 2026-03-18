@@ -9,7 +9,7 @@ dsNumSummary(x, datasources = DSI::datashield.connections_find())
 \arguments{
 \item{x}{A character string referring to a numeric column in a DataSHIELD table.}
 
-\item{datasources}{A list of \link[DSI]{DSConnection-class} objects.
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects.
 Default is to use all findable datasources.}
 }
 \value{
@@ -24,7 +24,25 @@ A similar function for all columns of a table is `dsNumVarSummary` which returns
 return the number of observations.
 }
 \examples{
-dsNumSummary("tab1$LAB_HDL")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsNumSummary("D$LAB_HDL")
 #    LAB_HDL        value
 #  1       N 5251.0000000
 #  2      5\%    0.8606589
@@ -35,4 +53,8 @@ dsNumSummary("tab1$LAB_HDL")
 #  7     90\%    2.0824057
 #  8     95\%    2.2191369
 #  9    Mean    1.5619572
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

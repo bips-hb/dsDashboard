@@ -23,7 +23,12 @@ The output is more convenient than using the ds.summary function directly,
 as it turns the information in a data.frame.
 }
 \examples{
-if (require(DSLite)) {
+if (require(DSLite) && require('dsBase') ) {
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+  require('dsBase')
+
 data('CNSIM1')
 data('CNSIM2')
 
@@ -39,13 +44,18 @@ logindata <- builder$build()
 
 # do login and table assignment
 conns <- DSI::datashield.login(logindata)
-datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
+DSI::datashield.assign.table(conns, 'tab1', table = list(server1='table1', server2='table2'))
 
 dsTableSummary("tab1")
-}
 
 # output:
 #    server number.of.rows number.of.columns variables.held
 # 1 server1           2163                11   LAB_TSC,....
 # 2 server2           3088                11   LAB_TSC,....
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+} else {
+  message("This example requires DSLite and dsBase")
+}
 }

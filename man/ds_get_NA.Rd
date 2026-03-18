@@ -11,9 +11,9 @@ ds_get_NA(tab, vars = NULL, datasources = DSI::datashield.connections_find())
 
 \item{vars}{A vector of character strings. Names of the variables in the table object `tab`.}
 
-\item{datasources}{a list of \code{\link{dsBaseClient::DSConnection-class}}
+\item{datasources}{a list of \link[DSI:DSConnection-class]{DSConnection-class}.
 objects obtained after login. If the \code{dsBaseClient::datasources} argument is not specified
-the default set of connections will be used: see \code{\link{dsBaseClient::datashield.connections_default}}.}
+the default set of connections will be used: see \link[DSI:datashield.connections_default]{datashield.connections_default()}.}
 }
 \value{
 A data.frame containing the number of missing values for each variable in table tab.
@@ -27,19 +27,41 @@ It returns for each of the requested variables (`vars`) in table `tab` from the
 if the variable is a factor or character string.
 }
 \examples{
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
 ds_get_NA("D", datasources=DSI::datashield.connections_find())
 # A tibble: 11 × 3
-   variable           feature  value
-   <chr>              <chr>    <chr>
- 1 LAB_TSC            missings 1005
- 2 LAB_TRIG           missings 1017
- 3 LAB_HDL            missings 1015
- 4 LAB_GLUC_ADJUSTED  missings 950
- 5 PM_BMI_CONTINUOUS  missings 302
- 6 DIS_CVA            missings 0
- 7 MEDI_LPD           missings 0
- 8 DIS_DIAB           missings 0
- 9 DIS_AMI            missings 0
-10 GENDER             missings 0
-11 PM_BMI_CATEGORICAL missings 302
+#    variable           feature  value
+#    <chr>              <chr>    <chr>
+#  1 LAB_TSC            missings 1005
+#  2 LAB_TRIG           missings 1017
+#  3 LAB_HDL            missings 1015
+#  4 LAB_GLUC_ADJUSTED  missings 950
+#  5 PM_BMI_CONTINUOUS  missings 302
+#  6 DIS_CVA            missings 0
+#  7 MEDI_LPD           missings 0
+#  8 DIS_DIAB           missings 0
+#  9 DIS_AMI            missings 0
+# 10 GENDER             missings 0
+# 11 PM_BMI_CATEGORICAL missings 302
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }

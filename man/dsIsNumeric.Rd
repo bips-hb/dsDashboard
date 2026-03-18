@@ -15,7 +15,7 @@ dsIsNumeric(
 
 \item{x.vars}{Optional character string vector; a subset of the variables in table x, on which the function shall be applied}
 
-\item{datasources}{A list of \code{\link{DSI::DSConnection-class}} objects. Default is to use all findable connections.}
+\item{datasources}{A list of \link[DSI:DSConnection-class]{DSConnection-class} objects. Default is to use all findable connections.}
 }
 \value{
 A vector of boolean.
@@ -24,11 +24,33 @@ A vector of boolean.
 Check if columns of a DataSHIELD table are numeric
 }
 \examples{
-dsIsNumeric("tab1")
+\dontrun{
+  # connecting to the Opal servers
+
+  require('DSI')
+  require('DSOpal')
+  require('dsBaseClient')
+
+  builder <- DSI::newDSLoginBuilder()
+  builder$append(server="study1", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM1")
+  builder$append(server="study3", url="https://opal-demo.obiba.org",
+                 user="administrator", password="password",
+                 table = "CNSIM.CNSIM3")
+  logindata <- builder$build()
+
+  conns <- DSI::datashield.login(logins = logindata, assign = TRUE, symbol = "D")
+
+dsIsNumeric("D")
 # LAB_TSC           LAB_TRIG            LAB_HDL  LAB_GLUC_ADJUSTED  PM_BMI_CONTINUOUS
 #    TRUE               TRUE               TRUE               TRUE               TRUE
 # DIS_CVA           MEDI_LPD           DIS_DIAB            DIS_AMI             GENDER
 #   FALSE              FALSE              FALSE              FALSE              FALSE
 # PM_BMI_CATEGORICAL
 #              FALSE
+
+  # clear the Datashield R sessions and logout
+  DSI::datashield.logout(conns)
+}
 }
