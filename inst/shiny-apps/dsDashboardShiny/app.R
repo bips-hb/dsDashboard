@@ -12,7 +12,7 @@
 #
 #Output: A shiny dashboard
 #
-#Date/Changes/Author: 07/11/2024 / Andreas Mändle
+#Date/Changes/Author: 20/03/2026 / Andreas Mändle
 ###############################################################################
 
 
@@ -22,7 +22,7 @@
 # devtools::install_github("haozhu233/kableExtra")  # new development version to make tables prettier
 # devtools::install_github("datashield/dsBaseClient")  # this is now also available from CRAN
 # devtools::install_github("datashield/dsBase")        # this is now also available from CRAN
-# devtools::install_github("BIPS/dsDashboard")
+# devtools::install_github("bips-hb/dsDashboard")
 # ----------------------
 # (2) some R packages might have to be installed:
 # install.packages("gdtools") # if gdtools::addGFontHtmlDependency(family = c("Roboto Condensed","Roboto")) causes Error: object ‘match_fonts’ is not exported by 'namespace:systemfonts'
@@ -3060,7 +3060,8 @@ server <- function(input, output, session) {
       lapply(xvec, function(x) {
         idx <- which(x==from_values)
         if (length(idx)>0) {
-          kableExtra::text_spec(ifelse(useLabels,to_values[idx],x),
+          kableExtra::cell_spec(ifelse(useLabels,to_values[idx],x),
+                                format = "html",
                                 underline=F,color=blues9[8],extra_css="cursor: pointer;",
                                 popover=spec_popover_delay(content=to_popover_values[idx],
                                                            trigger = c("click", "hover"),
@@ -3201,7 +3202,7 @@ server <- function(input, output, session) {
         grp_summ_stats <- NULL
       else
         grp_summ_stats <- jsonlite::fromJSON(globals$summaryDataCollection[[tab]][[jsonlite::toJSON(group_vars)]])
-browser()
+
       # request summaries for mod_vars, give function all_summaries the data already available (parameter current_data)
       isolate(summ_stats1 <- dsDashboard::dsGapply(tabsymbol, group_vars, all_summaries,
                                       vars=mod_vars, summaries=sum_stats_str,
@@ -3449,17 +3450,17 @@ browser()
     )
 
     # label the second header (summary statistics and group variables)
-    tab_head_names <- head2 %>%
-      # this labels the summaries with a context sensitive popover
-      label_variables(from_values = summary_names,
-                      to_values = summary_labels,
-                      to_popover_values = summary_descriptions,
-                      useLabels = USER$useLabels) %>%
-      # label the group variables with their name and a context sensitive popover
-      label_variables(from_values = selected_vars,
-                      to_values = var_lab[selected_vars],
-                      to_popover_values = var_desc[selected_vars],
-                      useLabels = USER$useLabels)
+      tab_head_names <- head2 %>%
+        # this labels the summaries with a context sensitive popover
+        label_variables(from_values = summary_names,
+                        to_values = summary_labels,
+                        to_popover_values = summary_descriptions,
+                        useLabels = USER$useLabels) %>%
+        # label the group variables with their name and a context sensitive popover
+        label_variables(from_values = selected_vars,
+                        to_values = var_lab[selected_vars],
+                        to_popover_values = var_desc[selected_vars],
+                        useLabels = USER$useLabels)
 
     # replace number of digits in the sparkline plots
     df_digits <- sapply(setNames(globals$metaDataCollection[[tab]][head1_raw,"spec"],
@@ -3478,7 +3479,7 @@ browser()
     }, df, df_digits + extraDigits + 2, SIMPLIFY = F)  %>% as_tibble()
 
     # create the summary table with kable
-    model_tab <- df %>% kableExtra::kbl(escape=F, digits=digits+extraDigits, col.names = tab_head_names) %>%
+    model_tab <- df %>% kableExtra::kbl(escape=F, format = "html", digits=digits+extraDigits, col.names = tab_head_names) %>%
       kableExtra::kable_styling()   %>%
       kableExtra::add_header_above(head1, escape=F)
 
