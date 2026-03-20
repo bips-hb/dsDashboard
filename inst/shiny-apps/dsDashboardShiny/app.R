@@ -3201,7 +3201,7 @@ server <- function(input, output, session) {
         grp_summ_stats <- NULL
       else
         grp_summ_stats <- jsonlite::fromJSON(globals$summaryDataCollection[[tab]][[jsonlite::toJSON(group_vars)]])
-browser()
+
       # request summaries for mod_vars, give function all_summaries the data already available (parameter current_data)
       isolate(summ_stats1 <- dsDashboard::dsGapply(tabsymbol, group_vars, all_summaries,
                                       vars=mod_vars, summaries=sum_stats_str,

@@ -1,7 +1,7 @@
 Type: Package
 Package: dsDashboard
 Title: Dashboard Framework for DataSHIELD Applications
-Version: 0.4.0
+Version: 0.4.1
 Author: Andreas M\u00e4ndle
 Maintainer: Andreas M\u00e4ndle <maendle@leibniz-bips.de>
 Description: Provides a framework for building interactive dashboards in

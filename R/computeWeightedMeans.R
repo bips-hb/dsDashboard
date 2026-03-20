@@ -1,3 +1,5 @@
+.datatable.aware = TRUE
+
 #' Compute Weighted Mean by Group
 #' 
 #' This function is originally from the panelaggregation package.
